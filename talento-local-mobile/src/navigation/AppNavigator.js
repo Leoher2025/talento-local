@@ -14,6 +14,13 @@ import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import HomeScreen from '../screens/main/HomeScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 
+// Pantallas de trabajos
+import JobsListScreen from '../screens/jobs/JobsListScreen';
+import CreateJobScreen from '../screens/jobs/CreateJobScreen';
+import MyJobsScreen from '../screens/jobs/MyJobsScreen';
+// import JobDetailScreen from '../screens/jobs/JobDetailScreen'; // Próxima a crear
+// import EditJobScreen from '../screens/jobs/EditJobScreen'; // Próxima a crear
+
 const Stack = createNativeStackNavigator();
 
 // Stack de autenticación (usuarios no logueados)
@@ -65,6 +72,8 @@ const AuthStack = () => {
 
 // Stack principal (usuarios logueados)
 const MainStack = () => {
+  const { user } = useAuth();
+  
   return (
     <Stack.Navigator
       screenOptions={{
@@ -91,6 +100,44 @@ const MainStack = () => {
           title: 'Mi Perfil',
         }}
       />
+      <Stack.Screen 
+        name="JobsList" 
+        component={JobsListScreen}
+        options={{ 
+          title: 'Trabajos Disponibles',
+        }}
+      />
+      <Stack.Screen 
+        name="CreateJob" 
+        component={CreateJobScreen}
+        options={{ 
+          title: 'Publicar Trabajo',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="MyJobs" 
+        component={MyJobsScreen}
+        options={{ 
+          title: 'Mis Trabajos',
+        }}
+      />
+      {/* Próximas pantallas
+      <Stack.Screen 
+        name="JobDetail" 
+        component={JobDetailScreen}
+        options={{ 
+          title: 'Detalle del Trabajo',
+        }}
+      />
+      <Stack.Screen 
+        name="EditJob" 
+        component={EditJobScreen}
+        options={{ 
+          title: 'Editar Trabajo',
+        }}
+      />
+      */}
     </Stack.Navigator>
   );
 };

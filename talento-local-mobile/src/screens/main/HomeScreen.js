@@ -17,9 +17,9 @@ export default function HomeScreen({ navigation }) {
   // Renderizar vista según el rol del usuario
   const renderContent = () => {
     if (user?.role === USER_ROLES.WORKER) {
-      return <WorkerHomeView />;
+      return <WorkerHomeView navigation={navigation} />;
     } else {
-      return <ClientHomeView />;
+      return <ClientHomeView navigation={navigation} />;
     }
   };
 
@@ -66,7 +66,7 @@ export default function HomeScreen({ navigation }) {
 }
 
 // Vista para Trabajadores
-const WorkerHomeView = () => {
+const WorkerHomeView = ({ navigation }) => {
   return (
     <View style={styles.content}>
       {/* Estadísticas rápidas */}
@@ -87,14 +87,25 @@ const WorkerHomeView = () => {
 
       {/* Sección de trabajos disponibles */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Trabajos Disponibles</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Trabajos Disponibles</Text>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('JobsList')}
+          >
+            <Text style={styles.sectionLink}>Ver todos →</Text>
+          </TouchableOpacity>
+        </View>
+        
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>📋</Text>
           <Text style={styles.emptyText}>
             No hay trabajos disponibles en tu área
           </Text>
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionButtonText}>Ajustar Filtros</Text>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('JobsList')}
+          >
+            <Text style={styles.actionButtonText}>Explorar Trabajos</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -103,26 +114,59 @@ const WorkerHomeView = () => {
 };
 
 // Vista para Clientes
-const ClientHomeView = () => {
+const ClientHomeView = ({ navigation }) => {
   return (
     <View style={styles.content}>
       {/* Búsqueda rápida */}
-      <View style={styles.searchContainer}>
+      <TouchableOpacity 
+        style={styles.searchContainer}
+        onPress={() => navigation.navigate('JobsList')}
+      >
         <Text style={styles.searchIcon}>🔍</Text>
         <Text style={styles.searchPlaceholder}>
           Buscar profesionales...
         </Text>
+      </TouchableOpacity>
+
+      {/* Accesos rápidos */}
+      <View style={styles.quickActions}>
+        <TouchableOpacity 
+          style={styles.quickActionCard}
+          onPress={() => {
+            console.log('Navegando a CreateJob...');
+            navigation.navigate('CreateJob');
+          }}
+        >
+          <Text style={styles.quickActionIcon}>➕</Text>
+          <Text style={styles.quickActionText}>Publicar Trabajo</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.quickActionCard}
+          onPress={() => navigation.navigate('MyJobs')}
+        >
+          <Text style={styles.quickActionIcon}>📝</Text>
+          <Text style={styles.quickActionText}>Mis Trabajos</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Categorías */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Categorías Populares</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Categorías Populares</Text>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('JobsList')}
+          >
+            <Text style={styles.sectionLink}>Ver todas →</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.categoriesGrid}>
           {JOB_CATEGORIES.slice(0, 6).map((category) => (
             <TouchableOpacity
               key={category.id}
               style={styles.categoryCard}
               activeOpacity={0.7}
+              onPress={() => navigation.navigate('JobsList', { categoryId: category.id })}
             >
               <Text style={styles.categoryIcon}>{category.icon}</Text>
               <Text style={styles.categoryName}>{category.name}</Text>
@@ -143,7 +187,13 @@ const ClientHomeView = () => {
       </View>
 
       {/* Botón de publicar trabajo */}
-      <TouchableOpacity style={styles.floatingButton}>
+      <TouchableOpacity 
+        style={styles.floatingButton}
+        onPress={() => {
+          console.log('Botón flotante presionado, navegando a CreateJob...');
+          navigation.navigate('CreateJob');
+        }}
+      >
         <Text style={styles.floatingButtonText}>+ Publicar Trabajo</Text>
       </TouchableOpacity>
     </View>
@@ -236,6 +286,37 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   
+  quickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: SPACING.lg,
+  },
+  
+  quickActionCard: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    alignItems: 'center',
+    marginHorizontal: SPACING.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  
+  quickActionIcon: {
+    fontSize: 30,
+    marginBottom: SPACING.xs,
+  },
+  
+  quickActionText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.primary,
+    fontWeight: '600',
+  },
+  
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -267,11 +348,23 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  
   sectionTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '600',
     color: COLORS.text.primary,
-    marginBottom: SPACING.md,
+  },
+  
+  sectionLink: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
   
   categoriesGrid: {
@@ -329,6 +422,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.md,
+    marginTop: SPACING.sm,
   },
   
   actionButtonText: {

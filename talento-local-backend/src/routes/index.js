@@ -6,9 +6,10 @@ const router = express.Router();
 
 // Importar rutas
 const authRoutes = require('./auth.routes');
+const jobRoutes = require('./job.routes');
 // const userRoutes = require('./user.routes'); // Implementaremos después
 // const profileRoutes = require('./profile.routes'); // Implementaremos después
-// const jobRoutes = require('./job.routes'); // Implementaremos después
+//const jobRoutes = require('./job.routes'); // Implementaremos después
 // const categoryRoutes = require('./category.routes'); // Implementaremos después
 
 // ============================
@@ -18,14 +19,14 @@ const authRoutes = require('./auth.routes');
 // Rutas de autenticación
 router.use('/auth', authRoutes);
 
+// Rutas de trabajos
+router.use('/jobs', jobRoutes);
+
 // Rutas de usuarios (próximo módulo)
 // router.use('/users', userRoutes);
 
 // Rutas de perfiles (próximo módulo)
 // router.use('/profiles', profileRoutes);
-
-// Rutas de trabajos (próximo módulo)
-// router.use('/jobs', jobRoutes);
 
 // Rutas de categorías (próximo módulo)
 // router.use('/categories', categoryRoutes);

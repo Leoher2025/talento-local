@@ -18,8 +18,8 @@ import ProfileScreen from '../screens/main/ProfileScreen';
 import JobsListScreen from '../screens/jobs/JobsListScreen';
 import CreateJobScreen from '../screens/jobs/CreateJobScreen';
 import MyJobsScreen from '../screens/jobs/MyJobsScreen';
-// import JobDetailScreen from '../screens/jobs/JobDetailScreen'; // Próxima a crear
-// import EditJobScreen from '../screens/jobs/EditJobScreen'; // Próxima a crear
+import JobDetailScreen from '../screens/jobs/JobDetailScreen';
+import EditJobScreen from '../screens/jobs/EditJobScreen'; // Próxima a crear
 
 const Stack = createNativeStackNavigator();
 
@@ -122,12 +122,12 @@ const MainStack = () => {
           title: 'Mis Trabajos',
         }}
       />
-      {/* Próximas pantallas
       <Stack.Screen 
         name="JobDetail" 
         component={JobDetailScreen}
         options={{ 
           title: 'Detalle del Trabajo',
+          headerShown: false,
         }}
       />
       <Stack.Screen 
@@ -135,9 +135,9 @@ const MainStack = () => {
         component={EditJobScreen}
         options={{ 
           title: 'Editar Trabajo',
+          headerShown: false,
         }}
       />
-      */}
     </Stack.Navigator>
   );
 };

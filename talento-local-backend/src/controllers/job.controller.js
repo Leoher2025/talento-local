@@ -1,4 +1,4 @@
-// src/controllers/job.controller.js - Controlador para manejo de trabajos
+// - Controlador para manejo de trabajos
 const JobModel = require('../models/job.model');
 const logger = require('../utils/logger');
 
@@ -142,7 +142,31 @@ class JobController {
     try {
       const { id } = req.params;
       const clientId = req.user.id;
-      const updateData = req.body;
+      
+      // Mapear campos de camelCase a snake_case para la BD
+      const updateData = {};
+      
+      if (req.body.title !== undefined) updateData.title = req.body.title;
+      if (req.body.description !== undefined) updateData.description = req.body.description;
+      if (req.body.category_id !== undefined) updateData.category_id = req.body.category_id;
+      if (req.body.categoryId !== undefined) updateData.category_id = req.body.categoryId; // Soporte para ambos
+      if (req.body.budget_amount !== undefined) updateData.budget_amount = req.body.budget_amount;
+      if (req.body.budgetAmount !== undefined) updateData.budget_amount = req.body.budgetAmount;
+      if (req.body.budget_type !== undefined) updateData.budget_type = req.body.budget_type;
+      if (req.body.budgetType !== undefined) updateData.budget_type = req.body.budgetType;
+      if (req.body.address !== undefined) updateData.address = req.body.address;
+      if (req.body.address_details !== undefined) updateData.address_details = req.body.address_details;
+      if (req.body.addressDetails !== undefined) updateData.address_details = req.body.addressDetails;
+      if (req.body.city !== undefined) updateData.city = req.body.city;
+      if (req.body.department !== undefined) updateData.department = req.body.department;
+      if (req.body.latitude !== undefined) updateData.latitude = req.body.latitude;
+      if (req.body.longitude !== undefined) updateData.longitude = req.body.longitude;
+      if (req.body.urgency !== undefined) updateData.urgency = req.body.urgency;
+      if (req.body.needed_date !== undefined) updateData.needed_date = req.body.needed_date;
+      if (req.body.neededDate !== undefined) updateData.needed_date = req.body.neededDate;
+
+      console.log('Datos de actualización recibidos:', req.body);
+      console.log('Datos mapeados para BD:', updateData);
 
       // Verificar que sea el dueño
       if (req.user.role !== 'client') {

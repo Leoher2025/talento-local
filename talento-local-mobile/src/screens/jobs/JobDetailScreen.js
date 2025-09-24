@@ -16,6 +16,8 @@ import { useAuth } from '../../context/AuthContext';
 import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES } from '../../utils/constants';
 import Toast from 'react-native-toast-message';
 import jobService from '../../services/jobService';
+import applicationService from '../../services/applicationService';
+import chatService from '../../services/chatService';
 
 export default function JobDetailScreen({ route, navigation }) {
   const { jobId } = route.params;
@@ -115,27 +117,78 @@ export default function JobDetailScreen({ route, navigation }) {
   };
 
   const handleApply = async () => {
-    // Esta función la implementaremos cuando tengamos el sistema de aplicaciones
-    Alert.alert(
-      'Aplicar al trabajo',
-      'Esta función estará disponible pronto',
-      [{ text: 'OK' }]
-    );
+    // Verificar si el usuario ya aplicó
+    try {
+      const response = await applicationService.checkIfApplied(jobId);
+      if (response.data?.has_applied) {
+        Alert.alert(
+          'Ya aplicaste',
+          'Ya has enviado una aplicación para este trabajo',
+          [
+            {
+              text: 'Ver mis aplicaciones',
+              onPress: () => navigation.navigate('MyApplications')
+            },
+            { text: 'OK', style: 'cancel' }
+          ]
+        );
+        return;
+      }
+    } catch (error) {
+      console.error('Error verificando aplicación:', error);
+    }
+
+    // Navegar a la pantalla de aplicación
+    navigation.navigate('Applications', { jobId: job.id });
   };
 
-  const handleContact = () => {
-    // Esta función la implementaremos cuando tengamos el sistema de chat
-    Alert.alert(
-      'Contactar',
-      'El sistema de mensajería estará disponible pronto',
-      [{ text: 'OK' }]
+const handleContact = async () => {
+  try {
+    // Determinar los IDs según el rol
+    let clientId, workerId;
+    
+    if (isOwner) {
+      // Si es el dueño (cliente), contactar al trabajador asignado
+      if (!job.assigned_worker_id) {
+        Alert.alert('Info', 'No hay trabajador asignado a este trabajo');
+        return;
+      }
+      clientId = user.id;
+      workerId = job.assigned_worker_id;
+    } else if (isWorker) {
+      // Si es trabajador, contactar al cliente
+      clientId = job.client_id;
+      workerId = user.id;
+    } else {
+      Alert.alert('Error', 'No tienes permiso para contactar');
+      return;
+    }
+    console.log("Detalle",job.id, " / ",clientId," / ", workerId);
+    // Obtener o crear conversación
+    const response = await chatService.getOrCreateConversation(
+      job.id,
+      clientId,
+      workerId
     );
-  };
+    
+    // Navegar al chat
+    navigation.navigate('ChatScreen', {
+      conversationId: response.data.id,
+      otherUserName: isOwner 
+        ? `${job.worker_first_name} ${job.worker_last_name}`
+        : `${job.client_first_name} ${job.client_last_name}`,
+      jobTitle: job.title
+    });
+  } catch (error) {
+    console.error('Error abriendo chat:', error);
+    Alert.alert('Error', 'No se pudo abrir el chat');
+  }
+};
 
   const handleOpenMap = () => {
     // Abrir la ubicación en el mapa
     const { latitude, longitude, address, city } = job;
-    
+
     if (latitude && longitude) {
       const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
       const latLng = `${latitude},${longitude}`;
@@ -153,7 +206,7 @@ export default function JobDetailScreen({ route, navigation }) {
         ios: `http://maps.apple.com/?q=${fullAddress}`,
         android: `https://www.google.com/maps/search/?api=1&query=${fullAddress}`
       });
-      
+
       Linking.openURL(url);
     }
   };
@@ -198,12 +251,12 @@ export default function JobDetailScreen({ route, navigation }) {
 
   const formatBudget = () => {
     if (!job) return '';
-    
+
     // Convertir a número si es string
-    const amount = typeof job.budget_amount === 'string' 
-      ? parseFloat(job.budget_amount) 
+    const amount = typeof job.budget_amount === 'string'
+      ? parseFloat(job.budget_amount)
       : job.budget_amount;
-    
+
     if (job.budget_type === 'fixed' && amount) {
       return `Q${amount.toFixed(2)}`;
     } else if (job.budget_type === 'hourly' && amount) {
@@ -269,7 +322,7 @@ export default function JobDetailScreen({ route, navigation }) {
           >
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
-          
+
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
             <Text style={styles.statusText}>{getStatusText(job.status)}</Text>
           </View>
@@ -328,7 +381,7 @@ export default function JobDetailScreen({ route, navigation }) {
             <Text style={styles.budgetAmount}>{formatBudget()}</Text>
             <Text style={styles.budgetType}>
               {job.budget_type === 'fixed' ? 'Precio fijo' :
-               job.budget_type === 'hourly' ? 'Por hora' : 'A convenir'}
+                job.budget_type === 'hourly' ? 'Por hora' : 'A convenir'}
             </Text>
           </View>
         </View>
@@ -420,18 +473,18 @@ export default function JobDetailScreen({ route, navigation }) {
                   >
                     <Text style={styles.primaryButtonText}>✏️ Editar Trabajo</Text>
                   </TouchableOpacity>
-                  
+
                   {job.applications_count > 0 && (
                     <TouchableOpacity
                       style={[styles.actionButton, styles.secondaryButton]}
-                      onPress={() => Alert.alert('Próximamente', 'Ver aplicaciones estará disponible pronto')}
+                      onPress={() => navigation.navigate('ManageApplications', { jobId: job.id })}
                     >
                       <Text style={styles.secondaryButtonText}>
                         👥 Ver Aplicaciones ({job.applications_count})
                       </Text>
                     </TouchableOpacity>
                   )}
-                  
+
                   <TouchableOpacity
                     style={[styles.actionButton, styles.dangerButton]}
                     onPress={handleDelete}
@@ -440,7 +493,7 @@ export default function JobDetailScreen({ route, navigation }) {
                   </TouchableOpacity>
                 </>
               )}
-              
+
               {job.status === 'in_progress' && (
                 <>
                   <TouchableOpacity
@@ -449,7 +502,7 @@ export default function JobDetailScreen({ route, navigation }) {
                   >
                     <Text style={styles.successButtonText}>✅ Marcar como Completado</Text>
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity
                     style={[styles.actionButton, styles.secondaryButton]}
                     onPress={handleContact}
@@ -458,7 +511,7 @@ export default function JobDetailScreen({ route, navigation }) {
                   </TouchableOpacity>
                 </>
               )}
-              
+
               {(job.status === 'active' || job.status === 'in_progress') && (
                 <TouchableOpacity
                   style={[styles.actionButton, styles.warningButton]}
@@ -484,7 +537,7 @@ export default function JobDetailScreen({ route, navigation }) {
                       <Text style={styles.primaryButtonText}>📝 Aplicar a este trabajo</Text>
                     )}
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity
                     style={[styles.actionButton, styles.secondaryButton]}
                     onPress={handleContact}
@@ -493,7 +546,7 @@ export default function JobDetailScreen({ route, navigation }) {
                   </TouchableOpacity>
                 </>
               )}
-              
+
               {job.status === 'in_progress' && job.assigned_worker_id === user.id && (
                 <TouchableOpacity
                   style={[styles.actionButton, styles.secondaryButton]}
@@ -515,38 +568,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  
+
   scrollContent: {
     flexGrow: 1,
     paddingBottom: SPACING.xl,
   },
-  
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   loadingText: {
     marginTop: SPACING.md,
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
   },
-  
+
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: SPACING.xl,
   },
-  
+
   errorText: {
     fontSize: FONT_SIZES.lg,
     color: COLORS.text.primary,
     marginBottom: SPACING.lg,
     textAlign: 'center',
   },
-  
+
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -556,40 +609,40 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray[200],
   },
-  
+
   backButton: {
     padding: SPACING.sm,
   },
-  
+
   backButtonText: {
     fontSize: FONT_SIZES['2xl'],
     color: COLORS.primary,
   },
-  
+
   statusBadge: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.full,
   },
-  
+
   statusText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.white,
     fontWeight: '600',
   },
-  
+
   titleSection: {
     padding: SPACING.lg,
     backgroundColor: COLORS.white,
   },
-  
+
   title: {
     fontSize: FONT_SIZES['2xl'],
     fontWeight: 'bold',
     color: COLORS.text.primary,
     marginBottom: SPACING.sm,
   },
-  
+
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -599,59 +652,59 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.md,
   },
-  
+
   categoryIcon: {
     fontSize: FONT_SIZES.lg,
     marginRight: SPACING.xs,
   },
-  
+
   categoryName: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
   },
-  
+
   urgencyBadge: {
     marginHorizontal: SPACING.lg,
     marginBottom: SPACING.md,
     padding: SPACING.md,
     borderRadius: RADIUS.md,
   },
-  
+
   urgencyText: {
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
   },
-  
+
   section: {
     padding: SPACING.lg,
     backgroundColor: COLORS.white,
     marginTop: SPACING.sm,
   },
-  
+
   sectionTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '600',
     color: COLORS.text.primary,
     marginBottom: SPACING.sm,
   },
-  
+
   description: {
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
     lineHeight: 24,
   },
-  
+
   clientSection: {
     padding: SPACING.lg,
     backgroundColor: COLORS.white,
     marginTop: SPACING.sm,
   },
-  
+
   clientInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  
+
   clientAvatar: {
     width: 50,
     height: 50,
@@ -661,46 +714,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: SPACING.md,
   },
-  
+
   avatarText: {
     fontSize: FONT_SIZES.xl,
     color: COLORS.white,
     fontWeight: 'bold',
   },
-  
+
   clientDetails: {
     flex: 1,
   },
-  
+
   clientName: {
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
     color: COLORS.text.primary,
     marginBottom: SPACING.xs / 2,
   },
-  
+
   clientRating: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
   },
-  
+
   budgetContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
-  
+
   budgetAmount: {
     fontSize: FONT_SIZES['2xl'],
     fontWeight: 'bold',
     color: COLORS.primary,
     marginRight: SPACING.sm,
   },
-  
+
   budgetType: {
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
   },
-  
+
   locationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -709,78 +762,78 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     borderRadius: RADIUS.md,
   },
-  
+
   locationInfo: {
     flex: 1,
     flexDirection: 'row',
   },
-  
+
   locationIcon: {
     fontSize: FONT_SIZES.xl,
     marginRight: SPACING.sm,
   },
-  
+
   locationTexts: {
     flex: 1,
   },
-  
+
   locationAddress: {
     fontSize: FONT_SIZES.base,
     color: COLORS.text.primary,
     fontWeight: '500',
   },
-  
+
   locationDetails: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
     marginTop: SPACING.xs / 2,
   },
-  
+
   locationCity: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
     marginTop: SPACING.xs / 2,
   },
-  
+
   mapLinkText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.primary,
     fontWeight: '600',
   },
-  
+
   neededDate: {
     fontSize: FONT_SIZES.base,
     color: COLORS.text.primary,
   },
-  
+
   infoSection: {
     padding: SPACING.lg,
     backgroundColor: COLORS.white,
     marginTop: SPACING.sm,
   },
-  
+
   infoItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: SPACING.sm,
   },
-  
+
   infoLabel: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
   },
-  
+
   infoValue: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.primary,
     fontWeight: '500',
   },
-  
+
   workerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  
+
   workerAvatar: {
     width: 50,
     height: 50,
@@ -790,29 +843,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: SPACING.md,
   },
-  
+
   workerDetails: {
     flex: 1,
   },
-  
+
   workerName: {
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
     color: COLORS.text.primary,
     marginBottom: SPACING.xs / 2,
   },
-  
+
   workerRating: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
   },
-  
+
   actionsSection: {
     padding: SPACING.lg,
     backgroundColor: COLORS.white,
     marginTop: SPACING.lg,
   },
-  
+
   actionButton: {
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
@@ -820,63 +873,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.sm,
   },
-  
+
   primaryButton: {
     backgroundColor: COLORS.primary,
   },
-  
+
   primaryButtonText: {
     color: COLORS.white,
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
   },
-  
+
   secondaryButton: {
     backgroundColor: COLORS.white,
     borderWidth: 2,
     borderColor: COLORS.primary,
   },
-  
+
   secondaryButtonText: {
     color: COLORS.primary,
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
   },
-  
+
   successButton: {
     backgroundColor: COLORS.success,
   },
-  
+
   successButtonText: {
     color: COLORS.white,
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
   },
-  
+
   dangerButton: {
     backgroundColor: COLORS.white,
     borderWidth: 2,
     borderColor: COLORS.error,
   },
-  
+
   dangerButtonText: {
     color: COLORS.error,
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
   },
-  
+
   warningButton: {
     backgroundColor: COLORS.white,
     borderWidth: 2,
     borderColor: COLORS.warning,
   },
-  
+
   warningButtonText: {
     color: COLORS.warning,
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
   },
-  
+
   button: {
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
@@ -884,7 +937,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     marginTop: SPACING.md,
   },
-  
+
   buttonText: {
     color: COLORS.white,
     fontSize: FONT_SIZES.base,

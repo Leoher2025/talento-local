@@ -7,9 +7,10 @@ const router = express.Router();
 // Importar rutas
 const authRoutes = require('./auth.routes');
 const jobRoutes = require('./job.routes');
+const applicationRoutes = require('./application.routes');
+const chatRoutes = require('./chat.routes');
 // const userRoutes = require('./user.routes'); // Implementaremos después
 // const profileRoutes = require('./profile.routes'); // Implementaremos después
-//const jobRoutes = require('./job.routes'); // Implementaremos después
 // const categoryRoutes = require('./category.routes'); // Implementaremos después
 
 // ============================
@@ -22,6 +23,9 @@ router.use('/auth', authRoutes);
 // Rutas de trabajos
 router.use('/jobs', jobRoutes);
 
+router.use('/applications', applicationRoutes);
+
+router.use('/chat', chatRoutes);
 // Rutas de usuarios (próximo módulo)
 // router.use('/users', userRoutes);
 

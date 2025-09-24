@@ -15,7 +15,7 @@
 // - Emulador Android: usa 10.0.2.2
 // - Emulador iOS: usa localhost o 127.0.0.1
 
-export const API_URL = 'http://192.168.101.18:5000/api'; // CAMBIA ESTA IP
+export const API_URL = 'http://192.168.101.14:5000/api'; // CAMBIA ESTA IP
 
 // ============================
 // COLORES DE LA APP

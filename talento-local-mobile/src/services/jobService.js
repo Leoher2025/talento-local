@@ -4,7 +4,7 @@ import { API_URL } from '../utils/constants';
 
 class JobService {
   constructor() {
-    this.baseURL = API_URL || 'http://192.168.101.18:5000/api';
+    this.baseURL = API_URL || 'http://192.168.101.14:5000/api';
   }
 
   // Método genérico para hacer peticiones

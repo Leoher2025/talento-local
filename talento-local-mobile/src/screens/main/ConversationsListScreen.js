@@ -9,7 +9,6 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   Alert
@@ -18,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES } from '../../utils/constants';
 import chatService from '../../services/chatService';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ConversationsListScreen({ navigation }) {
   const { user } = useAuth();

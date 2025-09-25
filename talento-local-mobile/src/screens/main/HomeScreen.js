@@ -5,11 +5,11 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
+  TouchableOpacity
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES, JOB_CATEGORIES } from '../../utils/constants';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -25,7 +25,7 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -36,12 +36,12 @@ export default function HomeScreen({ navigation }) {
               Hola, {user?.profile?.firstName || 'Usuario'} 👋
             </Text>
             <Text style={styles.subGreeting}>
-              {user?.role === USER_ROLES.WORKER 
+              {user?.role === USER_ROLES.WORKER
                 ? '¿Listo para trabajar hoy?'
                 : '¿Qué necesitas hoy?'}
             </Text>
           </View>
-          
+
           <TouchableOpacity
             style={styles.profileButton}
             onPress={() => navigation.navigate('Profile')}
@@ -89,19 +89,19 @@ const WorkerHomeView = ({ navigation }) => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Trabajos Disponibles</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => navigation.navigate('JobsList')}
           >
             <Text style={styles.sectionLink}>Ver todos →</Text>
           </TouchableOpacity>
         </View>
-        
+
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>📋</Text>
           <Text style={styles.emptyText}>
             No hay trabajos disponibles en tu área
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => navigation.navigate('JobsList')}
           >
@@ -118,7 +118,7 @@ const ClientHomeView = ({ navigation }) => {
   return (
     <View style={styles.content}>
       {/* Búsqueda rápida */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.searchContainer}
         onPress={() => navigation.navigate('JobsList')}
       >
@@ -130,7 +130,7 @@ const ClientHomeView = ({ navigation }) => {
 
       {/* Accesos rápidos */}
       <View style={styles.quickActions}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.quickActionCard}
           onPress={() => {
             console.log('Navegando a CreateJob...');
@@ -140,8 +140,8 @@ const ClientHomeView = ({ navigation }) => {
           <Text style={styles.quickActionIcon}>➕</Text>
           <Text style={styles.quickActionText}>Publicar Trabajo</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.quickActionCard}
           onPress={() => navigation.navigate('MyJobs')}
         >
@@ -154,7 +154,7 @@ const ClientHomeView = ({ navigation }) => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Categorías Populares</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => navigation.navigate('JobsList')}
           >
             <Text style={styles.sectionLink}>Ver todas →</Text>
@@ -186,8 +186,17 @@ const ClientHomeView = ({ navigation }) => {
         </View>
       </View>
 
+      // Boton para ir a Conversaciones
+      <TouchableOpacity
+        style={styles.chatButton}
+        onPress={() => navigation.navigate('ConversationsList')}
+      >
+        <Icon name="chat" size={24} color={COLORS.white} />
+        <Text style={styles.buttonText}>Mis Mensajes</Text>
+      </TouchableOpacity>
+
       {/* Botón de publicar trabajo */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.floatingButton}
         onPress={() => {
           console.log('Botón flotante presionado, navegando a CreateJob...');
@@ -205,12 +214,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  
+
   scrollContent: {
     flexGrow: 1,
     paddingBottom: SPACING.xl,
   },
-  
+
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -221,19 +230,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray[200],
   },
-  
+
   greeting: {
     fontSize: FONT_SIZES.xl,
     fontWeight: 'bold',
     color: COLORS.text.primary,
     marginBottom: SPACING.xs / 2,
   },
-  
+
   subGreeting: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
   },
-  
+
   profileButton: {
     width: 40,
     height: 40,
@@ -242,23 +251,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   profileIcon: {
     fontSize: FONT_SIZES.xl,
   },
-  
+
   content: {
     flex: 1,
     paddingHorizontal: SPACING.lg,
   },
-  
+
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: SPACING.lg,
     marginBottom: SPACING.xl,
   },
-  
+
   statCard: {
     flex: 1,
     backgroundColor: COLORS.white,
@@ -272,26 +281,26 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  
+
   statNumber: {
     fontSize: FONT_SIZES['2xl'],
     fontWeight: 'bold',
     color: COLORS.primary,
     marginBottom: SPACING.xs,
   },
-  
+
   statLabel: {
     fontSize: FONT_SIZES.xs,
     color: COLORS.text.secondary,
     textAlign: 'center',
   },
-  
+
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginVertical: SPACING.lg,
   },
-  
+
   quickActionCard: {
     flex: 1,
     backgroundColor: COLORS.white,
@@ -305,18 +314,18 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  
+
   quickActionIcon: {
     fontSize: 30,
     marginBottom: SPACING.xs,
   },
-  
+
   quickActionText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.primary,
     fontWeight: '600',
   },
-  
+
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -332,47 +341,47 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  
+
   searchIcon: {
     fontSize: FONT_SIZES.xl,
     marginRight: SPACING.sm,
   },
-  
+
   searchPlaceholder: {
     flex: 1,
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
   },
-  
+
   section: {
     marginBottom: SPACING.xl,
   },
-  
+
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  
+
   sectionTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '600',
     color: COLORS.text.primary,
   },
-  
+
   sectionLink: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.primary,
     fontWeight: '500',
   },
-  
+
   categoriesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  
+
   categoryCard: {
     width: '31%',
     backgroundColor: COLORS.white,
@@ -386,37 +395,37 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  
+
   categoryIcon: {
     fontSize: 30,
     marginBottom: SPACING.xs,
   },
-  
+
   categoryName: {
     fontSize: FONT_SIZES.xs,
     color: COLORS.text.primary,
     textAlign: 'center',
   },
-  
+
   emptyState: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     padding: SPACING.xl,
     alignItems: 'center',
   },
-  
+
   emptyIcon: {
     fontSize: 50,
     marginBottom: SPACING.md,
   },
-  
+
   emptyText: {
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
     textAlign: 'center',
     marginBottom: SPACING.md,
   },
-  
+
   actionButton: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.lg,
@@ -424,13 +433,13 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     marginTop: SPACING.sm,
   },
-  
+
   actionButtonText: {
     color: COLORS.white,
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
   },
-  
+
   floatingButton: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.lg,
@@ -444,13 +453,13 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 5,
   },
-  
+
   floatingButtonText: {
     color: COLORS.white,
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
   },
-  
+
   logoutButton: {
     backgroundColor: COLORS.error,
     marginHorizontal: SPACING.lg,
@@ -459,7 +468,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     alignItems: 'center',
   },
-  
+
   logoutText: {
     color: COLORS.white,
     fontSize: FONT_SIZES.base,

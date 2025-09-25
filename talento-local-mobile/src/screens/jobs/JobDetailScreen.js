@@ -49,6 +49,26 @@ export default function JobDetailScreen({ route, navigation }) {
     }
   };
 
+  // Función para iniciar chat
+const handleStartChat = async () => {
+  try {
+    const response = await chatService.getOrCreateConversation({
+      jobId: job.id,
+      clientId: job.client_id,
+      workerId: user.id  // o viceversa según el rol
+    });
+    
+    navigation.navigate('ChatScreen', {
+      conversationId: response.data.id,
+      otherUser: {
+        // datos del otro usuario
+      }
+    });
+  } catch (error) {
+    Alert.alert('Error', 'No se pudo iniciar la conversación');
+  }
+};
+
   const handleDelete = () => {
     Alert.alert(
       'Eliminar trabajo',
@@ -163,8 +183,14 @@ const handleContact = async () => {
       Alert.alert('Error', 'No tienes permiso para contactar');
       return;
     }
-    console.log("Detalle",job.id, " / ",clientId," / ", workerId);
-    // Obtener o crear conversación
+    
+    console.log("Creando conversación:", {
+      jobId: job.id,
+      clientId: clientId,
+      workerId: workerId
+    });
+    
+    // Obtener o crear conversación - CORREGIDO
     const response = await chatService.getOrCreateConversation(
       job.id,
       clientId,

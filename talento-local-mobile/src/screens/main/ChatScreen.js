@@ -26,7 +26,7 @@ export default function ChatScreen() {
   const navigation = useNavigation();
   const { user } = useAuth();
   const { conversationId, otherUserName, jobTitle } = route.params;
-  
+
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -34,7 +34,7 @@ export default function ChatScreen() {
   const [conversation, setConversation] = useState(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  
+
   const flatListRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -42,10 +42,10 @@ export default function ChatScreen() {
     loadConversation();
     loadMessages();
     markAllAsRead();
-    
+
     // Cargar borrador si existe
     loadDraft();
-    
+
     return () => {
       // Guardar borrador al salir
       if (inputMessage.trim()) {
@@ -66,20 +66,26 @@ export default function ChatScreen() {
   const loadMessages = async (loadMore = false) => {
     try {
       if (!loadMore) setIsLoading(true);
-      
+
       const response = await chatService.getMessages(conversationId, {
         page: loadMore ? page + 1 : 1,
         limit: 50
       });
-      
+
+      // Asegurarse de que response.messages sea un array
+      const newMessages = Array.isArray(response.messages) ? response.messages : [];
+
       if (loadMore) {
-        setMessages(prev => [...response.data, ...prev]);
+        setMessages(prev => {
+          const currentMessages = Array.isArray(prev) ? prev : [];
+          return [...newMessages, ...currentMessages];
+        });
         setPage(prev => prev + 1);
       } else {
-        setMessages(response.data);
+        setMessages(newMessages);
       }
-      
-      setHasMore(response.pagination.page < response.pagination.pages);
+
+      setHasMore(response.pagination?.page < response.pagination?.pages);
     } catch (error) {
       console.error('Error cargando mensajes:', error);
       Alert.alert('Error', 'No se pudieron cargar los mensajes');
@@ -109,46 +115,42 @@ export default function ChatScreen() {
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isSending) return;
-    
+
     const messageText = inputMessage.trim();
     setInputMessage('');
     setIsSending(true);
-    
-    // Limpiar borrador
-    await chatService.deleteDraft(conversationId);
-    
+
     try {
-      // Determinar el receptor
-      const receiverId = conversation?.client_id === user?.id 
-        ? conversation?.worker_id 
-        : conversation?.client_id;
-      
+      await chatService.deleteDraft(conversationId);
+
       const response = await chatService.sendMessage({
         conversationId: conversationId,
-        receiverId: receiverId,
-        messageText: messageText,
+        message: messageText,
         messageType: 'text'
       });
-      
-      // Agregar mensaje a la lista
-      const newMessage = {
-        ...response.data,
-        sender_id: user?.id,
-        sender_name: `${user?.first_name} ${user?.last_name}`,
-        sender_picture: user?.profile_picture_url
-      };
-      
-      setMessages(prev => [...prev, newMessage]);
-      
-      // Scroll al final
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-      
+
+      console.log('Respuesta del servidor:', response);
+
+      if (response && response.data) {
+        // AQUÍ ESTÁ LA CORRECCIÓN - Asegurarse de que siempre sea un array
+        setMessages(prevMessages => {
+          // Validar que prevMessages sea un array, si no, crear uno vacío
+          const currentMessages = Array.isArray(prevMessages) ? prevMessages : [];
+          return [...currentMessages, response.data];
+        });
+
+        // Scroll al final
+        setTimeout(() => {
+          if (flatListRef.current) {
+            flatListRef.current.scrollToEnd({ animated: true });
+          }
+        }, 100);
+      }
+
     } catch (error) {
       console.error('Error enviando mensaje:', error);
       Alert.alert('Error', 'No se pudo enviar el mensaje');
-      setInputMessage(messageText); // Restaurar mensaje
+      setInputMessage(messageText);
     } finally {
       setIsSending(false);
     }
@@ -192,26 +194,26 @@ export default function ChatScreen() {
     if (!timestamp) return '';
     const date = new Date(timestamp);
     const today = new Date();
-    
+
     if (date.toDateString() === today.toDateString()) {
       return 'Hoy';
     }
-    
+
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    
+
     if (date.toDateString() === yesterday.toDateString()) {
       return 'Ayer';
     }
-    
+
     return date.toLocaleDateString();
   };
 
   const renderMessage = ({ item, index }) => {
     const isOwnMessage = item.sender_id === user?.id;
-    const showDate = index === 0 || 
-      formatDate(messages[index - 1]?.created_at) !== formatDate(item.created_at);
-    
+    const showDate = index === 0 ||
+      (messages[index - 1] && formatDate(messages[index - 1]?.created_at) !== formatDate(item.created_at));
+
     return (
       <>
         {showDate && (
@@ -219,13 +221,14 @@ export default function ChatScreen() {
             <Text style={styles.dateText}>{formatDate(item.created_at)}</Text>
           </View>
         )}
-        
+
         <TouchableOpacity
           style={[
             styles.messageContainer,
             isOwnMessage ? styles.ownMessageContainer : styles.otherMessageContainer
           ]}
           onLongPress={() => isOwnMessage && handleDeleteMessage(item.id)}
+          activeOpacity={0.7}
         >
           {!isOwnMessage && (
             <View style={styles.avatarContainer}>
@@ -240,33 +243,24 @@ export default function ChatScreen() {
               )}
             </View>
           )}
-          
+
           <View style={[
             styles.messageBubble,
             isOwnMessage ? styles.ownMessageBubble : styles.otherMessageBubble
           ]}>
-            {item.message_type === 'text' ? (
-              <Text style={[
-                styles.messageText,
-                isOwnMessage ? styles.ownMessageText : styles.otherMessageText
-              ]}>
-                {item.message_text}
-              </Text>
-            ) : item.message_type === 'image' ? (
-              <View>
-                <Image source={{ uri: item.file_url }} style={styles.messageImage} />
-                <Text style={styles.imageCaption}>📷 Imagen</Text>
-              </View>
-            ) : (
-              <Text style={styles.fileMessage}>📎 {item.file_name || 'Archivo'}</Text>
-            )}
-            
+            <Text style={[
+              styles.messageText,
+              isOwnMessage ? styles.ownMessageText : styles.otherMessageText
+            ]}>
+              {item.message_text || ''}
+            </Text>
+
             <Text style={[
               styles.messageTime,
               isOwnMessage ? styles.ownMessageTime : styles.otherMessageTime
             ]}>
               {formatTime(item.created_at)}
-              {isOwnMessage && (
+              {isOwnMessage && item.status && (
                 <Text>
                   {item.status === 'read' ? ' ✓✓' : item.status === 'delivered' ? ' ✓' : ''}
                 </Text>
@@ -277,6 +271,8 @@ export default function ChatScreen() {
       </>
     );
   };
+
+  const safeMessages = Array.isArray(messages) ? messages : [];
 
   if (isLoading) {
     return (
@@ -294,29 +290,29 @@ export default function ChatScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        
+
         <View style={styles.headerInfo}>
           <Text style={styles.headerName}>{otherUserName || 'Usuario'}</Text>
           {jobTitle && (
             <Text style={styles.headerJob} numberOfLines={1}>📋 {jobTitle}</Text>
           )}
         </View>
-        
+
         <TouchableOpacity style={styles.menuButton}>
           <Text style={styles.menuIcon}>⋮</Text>
         </TouchableOpacity>
       </View>
 
       {/* Mensajes */}
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         style={styles.messagesContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={90}
       >
         <FlatList
           ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
+          data={safeMessages}
+          keyExtractor={(item) => item?.id ? String(item.id) : Math.random().toString()}
           renderItem={renderMessage}
           contentContainerStyle={styles.messagesList}
           onEndReached={handleLoadMore}
@@ -343,7 +339,7 @@ export default function ChatScreen() {
             multiline
             maxLength={1000}
           />
-          
+
           <TouchableOpacity
             style={[
               styles.sendButton,
@@ -369,19 +365,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   loadingText: {
     marginTop: SPACING.md,
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
   },
-  
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -391,54 +387,54 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray[200],
   },
-  
+
   backButton: {
     padding: SPACING.xs,
   },
-  
+
   backIcon: {
     fontSize: FONT_SIZES['2xl'],
     color: COLORS.text.primary,
   },
-  
+
   headerInfo: {
     flex: 1,
     marginLeft: SPACING.md,
   },
-  
+
   headerName: {
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
     color: COLORS.text.primary,
   },
-  
+
   headerJob: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.primary,
   },
-  
+
   menuButton: {
     padding: SPACING.xs,
   },
-  
+
   menuIcon: {
     fontSize: FONT_SIZES.xl,
     color: COLORS.text.primary,
   },
-  
+
   messagesContainer: {
     flex: 1,
   },
-  
+
   messagesList: {
     padding: SPACING.md,
   },
-  
+
   dateSeparator: {
     alignItems: 'center',
     marginVertical: SPACING.md,
   },
-  
+
   dateText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
@@ -447,111 +443,111 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.full,
   },
-  
+
   messageContainer: {
     marginBottom: SPACING.sm,
   },
-  
+
   ownMessageContainer: {
     alignItems: 'flex-end',
   },
-  
+
   otherMessageContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
-  
+
   avatarContainer: {
     marginRight: SPACING.sm,
   },
-  
+
   avatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
   },
-  
+
   avatarPlaceholder: {
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   avatarText: {
     fontSize: FONT_SIZES.sm,
     fontWeight: 'bold',
     color: COLORS.white,
   },
-  
+
   messageBubble: {
     maxWidth: '75%',
     padding: SPACING.sm,
     borderRadius: RADIUS.lg,
   },
-  
+
   ownMessageBubble: {
     backgroundColor: COLORS.primary,
   },
-  
+
   otherMessageBubble: {
     backgroundColor: COLORS.white,
   },
-  
+
   messageText: {
     fontSize: FONT_SIZES.base,
     lineHeight: 20,
   },
-  
+
   ownMessageText: {
     color: COLORS.white,
   },
-  
+
   otherMessageText: {
     color: COLORS.text.primary,
   },
-  
+
   messageTime: {
     fontSize: FONT_SIZES.xs,
     marginTop: SPACING.xs,
   },
-  
+
   ownMessageTime: {
     color: COLORS.white + 'CC',
   },
-  
+
   otherMessageTime: {
     color: COLORS.text.secondary,
   },
-  
+
   messageImage: {
     width: 200,
     height: 200,
     borderRadius: RADIUS.md,
     marginBottom: SPACING.xs,
   },
-  
+
   imageCaption: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.white,
   },
-  
+
   fileMessage: {
     fontSize: FONT_SIZES.base,
     color: COLORS.white,
   },
-  
+
   emptyMessages: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: SPACING.xl * 2,
   },
-  
+
   emptyText: {
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
   },
-  
+
   inputContainer: {
     flexDirection: 'row',
     backgroundColor: COLORS.white,
@@ -559,7 +555,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.gray[200],
   },
-  
+
   textInput: {
     flex: 1,
     minHeight: 40,
@@ -572,7 +568,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.base,
     color: COLORS.text.primary,
   },
-  
+
   sendButton: {
     width: 40,
     height: 40,
@@ -581,11 +577,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   sendButtonDisabled: {
     backgroundColor: COLORS.gray[400],
   },
-  
+
   sendIcon: {
     fontSize: FONT_SIZES.lg,
     color: COLORS.white,

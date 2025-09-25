@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { COLORS, FONT_SIZES, SPACING, RADIUS } from '../../utils/constants';
 import applicationService from '../../services/applicationService';
 import jobService from '../../services/jobService';
+import chatService from '../../services/chatService';
 
 export default function ManageApplicationsScreen() {
   const route = useRoute();
@@ -46,15 +47,15 @@ export default function ManageApplicationsScreen() {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      
+
       // Cargar detalles del trabajo
       const jobData = await jobService.getJobById(jobId);
       setJob(jobData);
-      
+
       // Cargar aplicaciones
       const response = await applicationService.getJobApplications(jobId);
       setApplications(response.data);
-      
+
       // Si hay una aplicación aceptada, seleccionarla automáticamente
       const accepted = response.data.find(app => app.status === 'accepted');
       if (accepted) {
@@ -69,27 +70,23 @@ export default function ManageApplicationsScreen() {
     }
   };
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    loadData().finally(() => setIsRefreshing(false));
-  };
-
   const handleAcceptApplication = async (applicationId, workerName) => {
     Alert.alert(
       'Aceptar Aplicación',
-      `¿Estás seguro de aceptar la aplicación de ${workerName}?\n\nLas demás aplicaciones serán rechazadas automáticamente.`,
+      `¿Estás seguro de que deseas aceptar la aplicación de ${workerName}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Aceptar',
           style: 'default',
           onPress: async () => {
-            setIsProcessing(true);
             try {
+              setIsProcessing(true);
               await applicationService.acceptApplication(applicationId);
               Alert.alert('✅ Éxito', 'Aplicación aceptada exitosamente');
-              handleRefresh();
+              await loadData(); // Recargar datos
             } catch (error) {
+              console.error('Error aceptando aplicación:', error);
               Alert.alert('Error', 'No se pudo aceptar la aplicación');
             } finally {
               setIsProcessing(false);
@@ -103,19 +100,20 @@ export default function ManageApplicationsScreen() {
   const handleRejectApplication = async (applicationId, workerName) => {
     Alert.alert(
       'Rechazar Aplicación',
-      `¿Estás seguro de rechazar la aplicación de ${workerName}?`,
+      `¿Estás seguro de que deseas rechazar la aplicación de ${workerName}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Rechazar',
           style: 'destructive',
           onPress: async () => {
-            setIsProcessing(true);
             try {
+              setIsProcessing(true);
               await applicationService.rejectApplication(applicationId);
               Alert.alert('✅ Éxito', 'Aplicación rechazada');
-              handleRefresh();
+              await loadData(); // Recargar datos
             } catch (error) {
+              console.error('Error rechazando aplicación:', error);
               Alert.alert('Error', 'No se pudo rechazar la aplicación');
             } finally {
               setIsProcessing(false);
@@ -126,16 +124,27 @@ export default function ManageApplicationsScreen() {
     );
   };
 
-  // FUNCIÓN handleContactWorker IMPLEMENTADA
+  // FUNCIÓN IMPORTANTE PARA EL CHAT
   const handleContactWorker = async (application) => {
     try {
+      console.log("Creando conversación con trabajador:", {
+        jobId: jobId,
+        clientId: user.id,
+        workerId: application.worker_id
+      });
+
+      // Importar el servicio de chat si no está importado
+      const chatService = require('../../services/chatService').default;
+
       // Obtener o crear conversación
       const response = await chatService.getOrCreateConversation(
         jobId,
-        user.id, // Cliente
-        application.worker_id
+        user.id, // Cliente (el dueño del trabajo)
+        application.worker_id // Trabajador que aplicó
       );
-      
+
+      console.log("Conversación creada/obtenida:", response);
+
       // Navegar al chat
       navigation.navigate('ChatScreen', {
         conversationId: response.data.id,
@@ -146,6 +155,11 @@ export default function ManageApplicationsScreen() {
       console.error('Error abriendo chat:', error);
       Alert.alert('Error', 'No se pudo abrir el chat');
     }
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadData().finally(() => setIsRefreshing(false));
   };
 
   const handleViewWorkerProfile = (workerId) => {
@@ -165,7 +179,7 @@ export default function ManageApplicationsScreen() {
         <Text style={styles.jobDescription} numberOfLines={2}>
           {job?.description}
         </Text>
-        
+
         <View style={styles.jobStats}>
           <View style={styles.statItem}>
             <Text style={styles.statIcon}>👥</Text>
@@ -238,12 +252,12 @@ export default function ManageApplicationsScreen() {
       >
         {/* Header con foto y nombre del trabajador */}
         <View style={styles.cardHeader}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.workerInfo}
             onPress={() => navigation.navigate('Profile', { userId: item.worker_id })}
           >
             <Image
-              source={{ 
+              source={{
                 uri: item.worker_image || 'https://via.placeholder.com/50'
               }}
               style={styles.workerImage}
@@ -265,22 +279,22 @@ export default function ManageApplicationsScreen() {
           {/* Badge de estado */}
           <View style={[
             styles.statusBadge,
-            { 
-              backgroundColor: isAccepted 
-                ? COLORS.success + '20' 
-                : isPending 
-                ? COLORS.warning + '20' 
-                : COLORS.error + '20' 
+            {
+              backgroundColor: isAccepted
+                ? COLORS.success + '20'
+                : isPending
+                  ? COLORS.warning + '20'
+                  : COLORS.error + '20'
             }
           ]}>
             <Text style={[
               styles.statusText,
-              { 
-                color: isAccepted 
-                  ? COLORS.success 
-                  : isPending 
-                  ? COLORS.warning 
-                  : COLORS.error 
+              {
+                color: isAccepted
+                  ? COLORS.success
+                  : isPending
+                    ? COLORS.warning
+                    : COLORS.error
               }
             ]}>
               {isAccepted ? '✅ Aceptada' : isPending ? '⏳ Pendiente' : '❌ Rechazada'}
@@ -291,8 +305,8 @@ export default function ManageApplicationsScreen() {
         {/* Propuesta del trabajador */}
         <View style={styles.proposalSection}>
           <Text style={styles.proposalLabel}>Propuesta:</Text>
-          <Text 
-            style={styles.proposalText} 
+          <Text
+            style={styles.proposalText}
             numberOfLines={isSelected ? undefined : 3}
           >
             {item.message}
@@ -312,9 +326,9 @@ export default function ManageApplicationsScreen() {
         <View style={styles.applicationMeta}>
           <Text style={styles.metaText}>
             📅 Aplicó el {new Date(item.created_at).toLocaleDateString()} a las{' '}
-            {new Date(item.created_at).toLocaleTimeString([], { 
-              hour: '2-digit', 
-              minute: '2-digit' 
+            {new Date(item.created_at).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit'
             })}
           </Text>
         </View>
@@ -371,8 +385,8 @@ export default function ManageApplicationsScreen() {
     <View style={styles.emptyState}>
       <Text style={styles.emptyIcon}>📭</Text>
       <Text style={styles.emptyTitle}>
-        {filterStatus === 'all' 
-          ? 'No hay aplicaciones todavía' 
+        {filterStatus === 'all'
+          ? 'No hay aplicaciones todavía'
           : `No hay aplicaciones ${statusFilters.find(s => s.key === filterStatus)?.label.toLowerCase()}`}
       </Text>
       <Text style={styles.emptyText}>
@@ -408,7 +422,7 @@ export default function ManageApplicationsScreen() {
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Gestionar Aplicaciones</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.editButton}
           onPress={() => navigation.navigate('EditJob', { jobId })}
         >
@@ -427,8 +441,8 @@ export default function ManageApplicationsScreen() {
           getFilteredApplications().length === 0 && styles.emptyListContent
         ]}
         refreshControl={
-          <RefreshControl 
-            refreshing={isRefreshing} 
+          <RefreshControl
+            refreshing={isRefreshing}
             onRefresh={handleRefresh}
             colors={[COLORS.primary]}
           />
@@ -453,7 +467,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -464,54 +478,54 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray[200],
   },
-  
+
   backButton: {
     padding: SPACING.xs,
     width: 40,
   },
-  
+
   backIcon: {
     fontSize: FONT_SIZES['2xl'],
     color: COLORS.text.primary,
   },
-  
+
   headerTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '600',
     color: COLORS.text.primary,
   },
-  
+
   editButton: {
     padding: SPACING.xs,
     width: 40,
     alignItems: 'flex-end',
   },
-  
+
   editIcon: {
     fontSize: FONT_SIZES.xl,
   },
-  
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.background,
   },
-  
+
   loadingText: {
     marginTop: SPACING.md,
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
   },
-  
+
   listContent: {
     padding: SPACING.md,
   },
-  
+
   emptyListContent: {
     flexGrow: 1,
   },
-  
+
   jobInfoCard: {
     backgroundColor: COLORS.white,
     padding: SPACING.lg,
@@ -523,56 +537,56 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  
+
   jobTitle: {
     fontSize: FONT_SIZES.xl,
     fontWeight: '600',
     color: COLORS.text.primary,
     marginBottom: SPACING.xs,
   },
-  
+
   jobDescription: {
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
     lineHeight: 20,
     marginBottom: SPACING.md,
   },
-  
+
   jobStats: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
   },
-  
+
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: SPACING.lg,
     marginTop: SPACING.xs,
   },
-  
+
   statIcon: {
     fontSize: FONT_SIZES.base,
     marginRight: SPACING.xs / 2,
   },
-  
+
   statText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
   },
-  
+
   urgencyBadge: {
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs / 2,
     borderRadius: RADIUS.full,
     marginTop: SPACING.xs,
   },
-  
+
   urgencyText: {
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
   },
-  
+
   filtersContainer: {
     backgroundColor: COLORS.white,
     paddingVertical: SPACING.md,
@@ -580,7 +594,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     borderRadius: RADIUS.lg,
   },
-  
+
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -590,26 +604,26 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.gray[100],
     borderRadius: RADIUS.full,
   },
-  
+
   filterChipActive: {
     backgroundColor: COLORS.primary,
   },
-  
+
   filterIcon: {
     fontSize: FONT_SIZES.sm,
     marginRight: SPACING.xs / 2,
   },
-  
+
   filterText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.primary,
   },
-  
+
   filterTextActive: {
     color: COLORS.white,
     fontWeight: '600',
   },
-  
+
   applicationCard: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
@@ -621,98 +635,98 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  
+
   selectedCard: {
     borderWidth: 2,
     borderColor: COLORS.primary,
   },
-  
+
   acceptedCard: {
     borderWidth: 2,
     borderColor: COLORS.success,
   },
-  
+
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: SPACING.md,
   },
-  
+
   workerInfo: {
     flexDirection: 'row',
     flex: 1,
   },
-  
+
   workerImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
     backgroundColor: COLORS.gray[200],
   },
-  
+
   workerDetails: {
     marginLeft: SPACING.sm,
     flex: 1,
   },
-  
+
   workerName: {
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
     color: COLORS.text.primary,
   },
-  
+
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: SPACING.xs / 2,
   },
-  
+
   ratingIcon: {
     fontSize: FONT_SIZES.sm,
   },
-  
+
   rating: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
     marginLeft: SPACING.xs / 2,
   },
-  
+
   verifiedIcon: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.primary,
     marginLeft: SPACING.xs,
     fontWeight: 'bold',
   },
-  
+
   statusBadge: {
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs / 2,
     borderRadius: RADIUS.full,
   },
-  
+
   statusText: {
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
   },
-  
+
   proposalSection: {
     marginBottom: SPACING.sm,
   },
-  
+
   proposalLabel: {
     fontSize: FONT_SIZES.xs,
     color: COLORS.text.secondary,
     fontWeight: '600',
     marginBottom: SPACING.xs / 2,
   },
-  
+
   proposalText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.primary,
     lineHeight: 18,
   },
-  
+
   budgetSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -722,35 +736,35 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.gray[50],
     borderRadius: RADIUS.sm,
   },
-  
+
   budgetIcon: {
     fontSize: FONT_SIZES.base,
     marginRight: SPACING.xs,
   },
-  
+
   budgetLabel: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
     marginRight: SPACING.xs,
   },
-  
+
   budgetAmount: {
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
     color: COLORS.text.primary,
   },
-  
+
   applicationMeta: {
     paddingTop: SPACING.xs,
     borderTopWidth: 1,
     borderTopColor: COLORS.gray[100],
   },
-  
+
   metaText: {
     fontSize: FONT_SIZES.xs,
     color: COLORS.text.secondary,
   },
-  
+
   actionButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -759,7 +773,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.gray[100],
   },
-  
+
   rejectButton: {
     flex: 1,
     flexDirection: 'row',
@@ -772,18 +786,18 @@ const styles = StyleSheet.create({
     borderColor: COLORS.error,
     borderRadius: RADIUS.md,
   },
-  
+
   rejectIcon: {
     fontSize: FONT_SIZES.sm,
     marginRight: SPACING.xs / 2,
   },
-  
+
   rejectButtonText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.error,
     fontWeight: '600',
   },
-  
+
   acceptButton: {
     flex: 1,
     flexDirection: 'row',
@@ -794,18 +808,18 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.success,
     borderRadius: RADIUS.md,
   },
-  
+
   acceptIcon: {
     fontSize: FONT_SIZES.sm,
     marginRight: SPACING.xs / 2,
   },
-  
+
   acceptButtonText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.white,
     fontWeight: '600',
   },
-  
+
   contactButton: {
     flex: 1,
     flexDirection: 'row',
@@ -816,18 +830,18 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.md,
   },
-  
+
   contactIcon: {
     fontSize: FONT_SIZES.sm,
     marginRight: SPACING.xs / 2,
   },
-  
+
   contactButtonText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.white,
     fontWeight: '600',
   },
-  
+
   profileButton: {
     flex: 1,
     flexDirection: 'row',
@@ -840,34 +854,34 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     borderRadius: RADIUS.md,
   },
-  
+
   profileIcon: {
     fontSize: FONT_SIZES.sm,
     marginRight: SPACING.xs / 2,
   },
-  
+
   profileButtonText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.primary,
     fontWeight: '500',
   },
-  
+
   buttonDisabled: {
     opacity: 0.6,
   },
-  
+
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: SPACING.xl * 2,
   },
-  
+
   emptyIcon: {
     fontSize: 60,
     marginBottom: SPACING.md,
   },
-  
+
   emptyTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '600',
@@ -875,7 +889,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
     textAlign: 'center',
   },
-  
+
   emptyText: {
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
@@ -883,20 +897,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xl,
     marginBottom: SPACING.lg,
   },
-  
+
   clearFilterButton: {
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.xl,
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.md,
   },
-  
+
   clearFilterText: {
     fontSize: FONT_SIZES.base,
     color: COLORS.white,
     fontWeight: '600',
   },
-  
+
   processingOverlay: {
     position: 'absolute',
     top: 0,
@@ -907,14 +921,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   processingContent: {
     backgroundColor: COLORS.primary,
     padding: SPACING.xl,
     borderRadius: RADIUS.lg,
     alignItems: 'center',
   },
-  
+
   processingText: {
     marginTop: SPACING.md,
     fontSize: FONT_SIZES.base,

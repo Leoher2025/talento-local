@@ -2,60 +2,64 @@
 const express = require('express');
 const router = express.Router();
 const chatController = require('../controllers/chat.controller');
-const authMiddleware = require('../middlewares/auth.middleware');
+const { authenticate, authorize, optionalAuth } = require('../middlewares/auth.middleware');
 const chatValidation = require('../middlewares/chat.validation.middleware');
-
-// Aplicar autenticación a todas las rutas
-//router.use(authMiddleware);
 
 // ============================
 // CONVERSACIONES
 // ============================
 
-// Obtener o crear conversación
+// Obtener o crear conversación (requiere autenticación)
 router.post(
   '/conversations',
+  authenticate,
   chatValidation.validateCreateConversation,
   chatController.getOrCreateConversation
 );
 
-// Obtener todas las conversaciones del usuario
+// Obtener todas las conversaciones del usuario (requiere autenticación)
 router.get(
   '/conversations',
+  authenticate,
   chatController.getUserConversations
 );
 
-// Obtener detalles de una conversación específica
+// Obtener detalles de una conversación específica (requiere autenticación)
 router.get(
   '/conversations/:conversationId',
+  authenticate,
   chatValidation.validateConversationId,
   chatController.getConversationById
 );
 
-// Archivar conversación
+// Archivar conversación (requiere autenticación)
 router.patch(
   '/conversations/:conversationId/archive',
+  authenticate,
   chatValidation.validateConversationId,
   chatController.archiveConversation
 );
 
-// Desarchivar conversación
+// Desarchivar conversación (requiere autenticación)
 router.patch(
   '/conversations/:conversationId/unarchive',
+  authenticate,
   chatValidation.validateConversationId,
   chatController.unarchiveConversation
 );
 
-// Bloquear usuario en conversación
+// Bloquear usuario en conversación (requiere autenticación)
 router.patch(
   '/conversations/:conversationId/block',
+  authenticate,
   chatValidation.validateConversationId,
   chatController.blockUser
 );
 
-// Desbloquear usuario en conversación
+// Desbloquear usuario en conversación (requiere autenticación)
 router.patch(
   '/conversations/:conversationId/unblock',
+  authenticate,
   chatValidation.validateConversationId,
   chatController.unblockUser
 );
@@ -64,37 +68,37 @@ router.patch(
 // MENSAJES
 // ============================
 
-// Obtener mensajes de una conversación
+// Obtener mensajes de una conversación (requiere autenticación)
 router.get(
   '/conversations/:conversationId/messages',
+  authenticate,
   chatValidation.validateConversationId,
   chatController.getMessages
 );
 
-// Enviar mensaje
+// Enviar mensaje (requiere autenticación)
 router.post(
   '/conversations/:conversationId/messages',
-  [
-    chatValidation.validateConversationId,
-    chatValidation.validateMessage
-  ],
+  authenticate,
+  chatValidation.validateConversationId,
+  chatValidation.validateMessage,
   chatController.sendMessage
 );
 
-// Marcar mensajes como leídos
+// Marcar mensajes como leídos (requiere autenticación)
 router.patch(
   '/conversations/:conversationId/messages/read',
+  authenticate,
   chatValidation.validateConversationId,
   chatController.markAsRead
 );
 
-// Reportar mensaje
+// Reportar mensaje (requiere autenticación)
 router.post(
   '/messages/:messageId/report',
-  [
-    chatValidation.validateMessageId,
-    chatValidation.validateReport
-  ],
+  authenticate,
+  chatValidation.validateMessageId,
+  chatValidation.validateReport,
   chatController.reportMessage
 );
 
@@ -102,9 +106,10 @@ router.post(
 // ESTADÍSTICAS
 // ============================
 
-// Obtener contador de mensajes no leídos
+// Obtener contador de mensajes no leídos (requiere autenticación)
 router.get(
   '/unread-count',
+  authenticate,
   chatController.getUnreadCount
 );
 

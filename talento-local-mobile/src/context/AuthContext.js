@@ -31,16 +31,16 @@ export const AuthProvider = ({ children }) => {
   const checkAuthState = async () => {
     try {
       setIsLoading(true);
-      
+
       // Obtener tokens guardados
       const accessToken = await AsyncStorage.getItem('accessToken');
       const refreshToken = await AsyncStorage.getItem('refreshToken');
       const userData = await AsyncStorage.getItem('userData');
-      
+
       if (accessToken && userData) {
         // Verificar si el token sigue siendo válido
         const isValid = await authService.verifyToken(accessToken);
-        
+
         if (isValid) {
           setUser(JSON.parse(userData));
           setIsAuthenticated(true);
@@ -71,24 +71,42 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       setIsLoading(true);
-      
+
       const response = await authService.login(email, password);
-      
+
       if (response.success) {
         // Guardar tokens y datos del usuario
         await AsyncStorage.setItem('accessToken', response.data.tokens.accessToken);
         await AsyncStorage.setItem('refreshToken', response.data.tokens.refreshToken);
-        await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
-        
-        setUser(response.data.user);
+        //await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+
+        // Reestructurar los datos del usuario para un acceso más fácil
+        const userData = {
+          id: response.data.user.id,
+          email: response.data.user.email,
+          phone: response.data.user.phone,
+          role: response.data.user.role,
+          verificationStatus: response.data.user.verificationStatus,
+          // Aplanar los datos del perfil para acceso más fácil
+          first_name: response.data.user.profile?.first_name || '',
+          last_name: response.data.user.profile?.last_name || '',
+          profile_picture_url: response.data.user.profile?.profile_picture_url || null,
+          // Mantener también el objeto profile completo
+          profile: response.data.user.profile
+        };
+
+        setUser(userData);
         setIsAuthenticated(true);
-        
+
+        // Guardar en almacenamiento local
+        await AsyncStorage.setItem('userData', JSON.stringify(userData));
+
         Toast.show({
           type: 'success',
           text1: '¡Bienvenido!',
-          text2: 'Has iniciado sesión exitosamente'
+          text2: `Hola ${userData.first_name || userData.email}`
         });
-        
+
         return { success: true };
       } else {
         Toast.show({
@@ -115,24 +133,24 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setIsLoading(true);
-      
+
       const response = await authService.register(userData);
-      
+
       if (response.success) {
         // Guardar tokens y datos del usuario
         await AsyncStorage.setItem('accessToken', response.data.tokens.accessToken);
         await AsyncStorage.setItem('refreshToken', response.data.tokens.refreshToken);
         await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
-        
+
         setUser(response.data.user);
         setIsAuthenticated(true);
-        
+
         Toast.show({
           type: 'success',
           text1: '¡Cuenta creada!',
           text2: 'Tu registro ha sido exitoso'
         });
-        
+
         return { success: true };
       } else {
         Toast.show({
@@ -163,15 +181,15 @@ export const AuthProvider = ({ children }) => {
       if (refreshToken) {
         await authService.logout(refreshToken);
       }
-      
+
       // Limpiar almacenamiento local
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');
       await AsyncStorage.removeItem('userData');
-      
+
       setUser(null);
       setIsAuthenticated(false);
-      
+
       Toast.show({
         type: 'info',
         text1: 'Sesión cerrada',

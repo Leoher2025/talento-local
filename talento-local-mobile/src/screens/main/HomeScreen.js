@@ -189,9 +189,9 @@ const ClientHomeView = ({ navigation }) => {
       // Boton para ir a Conversaciones
       <TouchableOpacity
         style={styles.chatButton}
-        onPress={() => navigation.navigate('ConversationsList')}
+        onPress={() => navigation.navigate('ConversationsScreen')}
       >
-        <Icon name="chat" size={24} color={COLORS.white} />
+        <Text style={styles.chatIcon}>💬</Text>
         <Text style={styles.buttonText}>Mis Mensajes</Text>
       </TouchableOpacity>
 
@@ -474,4 +474,9 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
   },
+
+  chatIcon: {
+    fontSize: 24,
+    color: COLORS.white,
+  }
 });

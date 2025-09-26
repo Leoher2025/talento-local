@@ -14,10 +14,11 @@ import {
   TextInput,
   Image
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
 import chatService from '../../services/chatService';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../context/AuthContext';
+import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES } from '../../utils/constants';
 
 const ConversationsScreen = () => {
   const navigation = useNavigation();
@@ -48,21 +49,37 @@ const ConversationsScreen = () => {
       const filters = {
         status: activeFilter,
         page: loadMore ? page + 1 : 1,
-        limit: 20
+        search: searchQuery
       };
 
       const response = await chatService.getUserConversations(filters);
+
+      // getUserConversations devuelve { conversations: [], pagination: {} }
+      const conversationsList = response.conversations || [];
       
       if (loadMore) {
-        setConversations(prev => [...prev, ...response.conversations]);
-        setPage(prev => prev + 1);
+        setConversations(prev => [...prev, ...conversationsList]);
+        setPage(page + 1);
       } else {
-        setConversations(response.conversations);
+        setConversations(conversationsList);
         setPage(1);
       }
       
-      setHasMore(response.pagination?.page < response.pagination?.pages);
+      // Actualizar contador de no leídos
+      const unreadData = conversationsList.reduce((acc, conv) => {
+        const unread = user?.role === USER_ROLES.CLIENT 
+          ? conv.client_unread_count 
+          : conv.worker_unread_count;
+        
+        if (unread > 0) {
+          acc.conversations += 1;
+          acc.messages += unread;
+        }
+        return acc;
+      }, { conversations: 0, messages: 0 });
       
+      setUnreadCount(unreadData);
+      setHasMore(response.pagination?.page < response.pagination?.pages);
     } catch (error) {
       console.error('Error cargando conversaciones:', error);
       Alert.alert('Error', 'No se pudieron cargar las conversaciones');
@@ -73,109 +90,53 @@ const ConversationsScreen = () => {
     }
   };
 
-  // Cargar contador de no leídos
-  const loadUnreadCount = async () => {
-    try {
-      const count = await chatService.getUnreadCount();
-      setUnreadCount(count);
-    } catch (error) {
-      console.error('Error cargando contador de no leídos:', error);
-    }
-  };
-
-  // Efecto para cargar datos al montar
+  // Efecto para cargar conversaciones cuando cambia el filtro o búsqueda
   useEffect(() => {
-    loadConversations();
-    loadUnreadCount();
-  }, [activeFilter]);
+    const delayDebounce = setTimeout(() => {
+      loadConversations();
+    }, searchQuery ? 500 : 0);
 
-  // Recargar cuando la pantalla obtiene el foco
+    return () => clearTimeout(delayDebounce);
+  }, [activeFilter, searchQuery]);
+
+  // Recargar cuando la pantalla tiene foco
   useFocusEffect(
     useCallback(() => {
-      loadUnreadCount();
-      return () => {};
+      loadConversations();
     }, [])
   );
 
-  // Conectar WebSocket para actualizaciones en tiempo real
-  useEffect(() => {
-    if (user?.id) {
-      chatService.connectWebSocket(user.id, handleWebSocketMessage);
-      
-      return () => {
-        chatService.disconnectWebSocket();
-      };
-    }
-  }, [user?.id]);
-
-  // Manejar mensajes del WebSocket
-  const handleWebSocketMessage = (data) => {
-    if (data.type === 'new_message') {
-      // Actualizar la conversación correspondiente
-      setConversations(prev => {
-        const updated = [...prev];
-        const index = updated.findIndex(c => c.id === data.conversation_id);
-        if (index !== -1) {
-          updated[index] = {
-            ...updated[index],
-            last_message_text: data.message_text,
-            last_message_time: data.created_at,
-            unread_count: (updated[index].unread_count || 0) + 1
-          };
-          // Mover al principio
-          const [conversation] = updated.splice(index, 1);
-          updated.unshift(conversation);
-        }
-        return updated;
-      });
-      
-      // Actualizar contador de no leídos
-      setUnreadCount(prev => ({
-        conversations: prev.conversations,
-        messages: prev.messages + 1
-      }));
-    }
-  };
-
-  // Navegar al chat
+  // Abrir conversación
   const handleConversationPress = (conversation) => {
-    navigation.navigate('Chat', { 
+    navigation.navigate('ChatScreen', {
       conversationId: conversation.id,
-      otherUser: {
-        id: conversation.client_id === user?.id ? conversation.worker_id : conversation.client_id,
-        name: conversation.client_id === user?.id ? conversation.worker_name : conversation.client_name,
-        picture: conversation.client_id === user?.id ? conversation.worker_picture : conversation.client_picture
-      }
+      otherUserId: user?.role === USER_ROLES.CLIENT 
+        ? conversation.worker_id 
+        : conversation.client_id,
+      otherUserName: user?.role === USER_ROLES.CLIENT 
+        ? conversation.worker_name 
+        : conversation.client_name,
+      jobId: conversation.job_id,
+      jobTitle: conversation.job_title
     });
   };
 
   // Archivar conversación
   const handleArchiveConversation = async (conversationId) => {
-    Alert.alert(
-      'Archivar conversación',
-      '¿Estás seguro de que quieres archivar esta conversación?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Archivar',
-          onPress: async () => {
-            try {
-              await chatService.archiveConversation(conversationId);
-              setConversations(prev => prev.filter(c => c.id !== conversationId));
-            } catch (error) {
-              Alert.alert('Error', 'No se pudo archivar la conversación');
-            }
-          }
-        }
-      ]
-    );
+    try {
+      await chatService.archiveConversation(conversationId);
+      loadConversations();
+      Alert.alert('Éxito', 'Conversación archivada');
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo archivar la conversación');
+    }
   };
 
   // Bloquear usuario
   const handleBlockUser = async (conversationId) => {
     Alert.alert(
-      'Bloquear usuario',
-      '¿Estás seguro de que quieres bloquear a este usuario? No podrás recibir mensajes de esta persona.',
+      'Confirmar bloqueo',
+      '¿Estás seguro de que deseas bloquear a este usuario? No podrán enviarte más mensajes.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -184,8 +145,8 @@ const ConversationsScreen = () => {
           onPress: async () => {
             try {
               await chatService.blockUser(conversationId);
-              setConversations(prev => prev.filter(c => c.id !== conversationId));
-              Alert.alert('Usuario bloqueado', 'El usuario ha sido bloqueado exitosamente');
+              loadConversations();
+              Alert.alert('Usuario bloqueado', 'Este usuario ya no puede contactarte');
             } catch (error) {
               Alert.alert('Error', 'No se pudo bloquear al usuario');
             }
@@ -195,21 +156,31 @@ const ConversationsScreen = () => {
     );
   };
 
-  // Filtrar conversaciones por búsqueda
-  const filteredConversations = conversations.filter(conv => {
-    if (!searchQuery) return true;
+  // Función para formatear fecha
+  const formatMessageDate = (dateString) => {
+    if (!dateString) return '';
     
-    const otherUserName = conv.client_id === user?.id 
-      ? conv.worker_name 
-      : conv.client_name;
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
     
-    return otherUserName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           conv.job_title?.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+    if (diffMins < 1) return 'Ahora';
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays < 7) return `${diffDays}d`;
+    
+    return date.toLocaleDateString('es', { 
+      day: 'numeric', 
+      month: 'short' 
+    });
+  };
 
-  // Renderizar item de conversación
-  const renderConversationItem = ({ item }) => {
-    const isClient = item.client_id === user?.id;
+  // Renderizar conversación
+  const renderConversation = ({ item }) => {
+    const isClient = user?.role === USER_ROLES.CLIENT;
     const otherUserName = isClient ? item.worker_name : item.client_name;
     const otherUserPicture = isClient ? item.worker_picture : item.client_picture;
     const unreadCount = isClient ? item.worker_unread_count : item.client_unread_count;
@@ -258,9 +229,7 @@ const ConversationsScreen = () => {
                 {otherUserName || 'Usuario'}
               </Text>
               <Text style={styles.timeText}>
-                {item.last_message_time 
-                  ? chatService.formatMessageDate(item.last_message_time)
-                  : ''}
+                {formatMessageDate(item.last_message_time)}
               </Text>
             </View>
             
@@ -288,7 +257,7 @@ const ConversationsScreen = () => {
   // Renderizar lista vacía
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
-      <Icon name="chat-bubble-outline" size={80} color="#ccc" />
+      <Text style={styles.emptyIcon}>💬</Text>
       <Text style={styles.emptyTitle}>No hay conversaciones</Text>
       <Text style={styles.emptySubtitle}>
         {activeFilter === 'archived' 
@@ -303,7 +272,7 @@ const ConversationsScreen = () => {
     if (!isLoadingMore) return null;
     return (
       <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color="#007AFF" />
+        <ActivityIndicator size="small" color={COLORS.primary} />
       </View>
     );
   };
@@ -318,14 +287,14 @@ const ConversationsScreen = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Cargando conversaciones...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header con búsqueda */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Mensajes</Text>
@@ -340,17 +309,17 @@ const ConversationsScreen = () => {
       
       {/* Barra de búsqueda */}
       <View style={styles.searchContainer}>
-        <Icon name="search" size={20} color="#999" style={styles.searchIcon} />
+        <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
           placeholder="Buscar conversaciones..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholderTextColor="#999"
+          placeholderTextColor={COLORS.text.secondary}
         />
         {searchQuery !== '' && (
           <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Icon name="close" size={20} color="#999" />
+            <Text style={styles.clearIcon}>❌</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -358,183 +327,204 @@ const ConversationsScreen = () => {
       {/* Filtros */}
       <View style={styles.filterContainer}>
         <TouchableOpacity
-          style={[styles.filterTab, activeFilter === 'active' && styles.filterTabActive]}
+          style={[
+            styles.filterButton,
+            activeFilter === 'active' && styles.filterButtonActive
+          ]}
           onPress={() => setActiveFilter('active')}
         >
-          <Text style={[styles.filterText, activeFilter === 'active' && styles.filterTextActive]}>
+          <Text style={[
+            styles.filterText,
+            activeFilter === 'active' && styles.filterTextActive
+          ]}>
             Activas
           </Text>
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={[styles.filterTab, activeFilter === 'archived' && styles.filterTabActive]}
+          style={[
+            styles.filterButton,
+            activeFilter === 'archived' && styles.filterButtonActive
+          ]}
           onPress={() => setActiveFilter('archived')}
         >
-          <Text style={[styles.filterText, activeFilter === 'archived' && styles.filterTextActive]}>
+          <Text style={[
+            styles.filterText,
+            activeFilter === 'archived' && styles.filterTextActive
+          ]}>
             Archivadas
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.filterTab, activeFilter === 'blocked' && styles.filterTabActive]}
-          onPress={() => setActiveFilter('blocked')}
-        >
-          <Text style={[styles.filterText, activeFilter === 'blocked' && styles.filterTextActive]}>
-            Bloqueadas
           </Text>
         </TouchableOpacity>
       </View>
       
       {/* Lista de conversaciones */}
       <FlatList
-        data={filteredConversations}
-        renderItem={renderConversationItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
+        data={conversations}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderConversation}
+        ListEmptyComponent={renderEmptyList}
+        ListFooterComponent={renderFooter}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={() => loadConversations(true)}
-            colors={['#007AFF']}
+            colors={[COLORS.primary]}
           />
         }
-        ListEmptyComponent={renderEmptyList}
-        ListFooterComponent={renderFooter}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.1}
+        contentContainerStyle={conversations.length === 0 && styles.emptyListContent}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: COLORS.background,
   },
+  
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
+    backgroundColor: COLORS.background,
   },
+  
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
+    marginTop: SPACING.md,
+    fontSize: FONT_SIZES.base,
+    color: COLORS.text.secondary,
   },
+  
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    backgroundColor: COLORS.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: COLORS.gray[200],
   },
+  
   headerTitle: {
-    fontSize: 28,
+    fontSize: FONT_SIZES['2xl'],
     fontWeight: 'bold',
-    color: '#333',
+    color: COLORS.text.primary,
   },
+  
   totalUnreadBadge: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
+    backgroundColor: COLORS.error,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
   },
+  
   totalUnreadText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: FONT_SIZES.sm,
+    fontWeight: 'bold',
   },
+  
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    margin: 15,
-    paddingHorizontal: 15,
-    borderRadius: 25,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    backgroundColor: COLORS.white,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray[200],
   },
+  
   searchIcon: {
-    marginRight: 10,
+    fontSize: FONT_SIZES.lg,
+    marginRight: SPACING.sm,
   },
+  
   searchInput: {
     flex: 1,
-    height: 45,
-    fontSize: 16,
-    color: '#333',
+    fontSize: FONT_SIZES.base,
+    color: COLORS.text.primary,
+    paddingVertical: SPACING.xs,
   },
+  
+  clearIcon: {
+    fontSize: FONT_SIZES.base,
+    marginLeft: SPACING.sm,
+  },
+  
   filterContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 15,
-    marginBottom: 10,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray[200],
   },
-  filterTab: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    marginRight: 10,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
+  
+  filterButton: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    marginRight: SPACING.sm,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.gray[100],
   },
-  filterTabActive: {
-    backgroundColor: '#007AFF',
+  
+  filterButtonActive: {
+    backgroundColor: COLORS.primary,
   },
+  
   filterText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
     fontWeight: '500',
   },
+  
   filterTextActive: {
-    color: '#fff',
+    color: COLORS.white,
   },
-  listContainer: {
-    flexGrow: 1,
-  },
+  
   conversationItem: {
-    backgroundColor: '#fff',
-    marginHorizontal: 15,
-    marginVertical: 5,
-    borderRadius: 12,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray[100],
   },
+  
   conversationContent: {
     flexDirection: 'row',
-    padding: 15,
+    padding: SPACING.md,
   },
+  
   avatarContainer: {
     position: 'relative',
-    marginRight: 15,
+    marginRight: SPACING.md,
   },
+  
   avatar: {
     width: 55,
     height: 55,
     borderRadius: 27.5,
   },
+  
   avatarPlaceholder: {
-    backgroundColor: '#007AFF',
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  
   avatarText: {
-    color: '#fff',
-    fontSize: 24,
+    color: COLORS.white,
+    fontSize: FONT_SIZES['xl'],
     fontWeight: 'bold',
   },
+  
   unreadBadge: {
     position: 'absolute',
     top: -5,
     right: -5,
-    backgroundColor: '#FF3B30',
+    backgroundColor: COLORS.error,
     borderRadius: 12,
     minWidth: 24,
     height: 24,
@@ -542,67 +532,87 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 6,
   },
+  
   unreadBadgeText: {
-    color: '#fff',
-    fontSize: 12,
+    color: COLORS.white,
+    fontSize: FONT_SIZES.xs,
     fontWeight: 'bold',
   },
+  
   conversationInfo: {
     flex: 1,
     justifyContent: 'center',
   },
+  
   conversationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
   },
+  
   userName: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.base,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.text.primary,
     flex: 1,
   },
+  
   timeText: {
-    fontSize: 12,
-    color: '#999',
-    marginLeft: 10,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.text.secondary,
+    marginLeft: SPACING.sm,
   },
+  
   jobTitle: {
-    fontSize: 13,
-    color: '#666',
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
     marginBottom: 4,
   },
+  
   lastMessage: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
     lineHeight: 18,
   },
+  
   unreadMessage: {
     fontWeight: '500',
-    color: '#333',
+    color: COLORS.text.primary,
   },
+  
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: 100,
   },
+  
+  emptyIcon: {
+    fontSize: 80,
+    marginBottom: SPACING.lg,
+  },
+  
   emptyTitle: {
-    fontSize: 20,
+    fontSize: FONT_SIZES.xl,
     fontWeight: '600',
-    color: '#333',
-    marginTop: 20,
+    color: COLORS.text.primary,
+    marginBottom: SPACING.sm,
   },
+  
   emptySubtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 10,
+    fontSize: FONT_SIZES.base,
+    color: COLORS.text.secondary,
     textAlign: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: SPACING.xl,
   },
+  
+  emptyListContent: {
+    flexGrow: 1,
+  },
+  
   footerLoader: {
-    paddingVertical: 20,
+    paddingVertical: SPACING.lg,
     alignItems: 'center',
   },
 });

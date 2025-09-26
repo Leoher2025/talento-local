@@ -27,7 +27,7 @@ import MyApplicationsScreen from '../screens/main/MyApplicationsScreen';
 import ManageApplicationsScreen from '../screens/main/ManageApplicationsScreen';
 
 // Pantallas de chat
-import ConversationsListScreen from '../screens/main/ConversationsListScreen';
+import ConversationsScreen from '../screens/main/ConversationsScreen';
 import ChatScreen from '../screens/main/ChatScreen';
 
 const Stack = createNativeStackNavigator();
@@ -173,8 +173,8 @@ const MainStack = () => {
         }}
       />
       <Stack.Screen
-        name="ConversationsList"
-        component={ConversationsListScreen}
+        name="ConversationsScreen"
+        component={ConversationsScreen}
         options={{
           title: 'Mensajes',
           headerShown: false

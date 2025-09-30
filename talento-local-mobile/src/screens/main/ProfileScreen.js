@@ -8,9 +8,10 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Switch,
+  Image
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
-import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES } from '../../utils/constants';
+import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES, API_URL, STATIC_URL } from '../../utils/constants';
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -75,14 +76,29 @@ export default function ProfileScreen({ navigation }) {
       >
         {/* Información del Perfil */}
         <View style={styles.profileHeader}>
-          <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>
-              {user?.profile?.firstName?.[0]?.toUpperCase() || '👤'}
-            </Text>
-          </View>
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            onPress={handleEditProfile}
+          >
+            {user?.profile_picture_url || user?.profile?.profile_picture_url ? (
+              <Image
+                source={{
+                  uri: (user?.profile_picture_url || user?.profile?.profile_picture_url).startsWith('http')
+                    ? (user?.profile_picture_url || user?.profile?.profile_picture_url)
+                    : `${STATIC_URL}${user?.profile_picture_url || user?.profile?.profile_picture_url}`
+                }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {user?.profile?.first_name?.[0]?.toUpperCase() ||
+                  user?.first_name?.[0]?.toUpperCase() || '👤'}
+              </Text>
+            )}
+          </TouchableOpacity>
 
           <Text style={styles.userName}>
-            {user?.profile?.firstName} {user?.profile?.lastName}
+            {user?.profile?.first_name || user?.first_name} {user?.profile?.last_name || user?.last_name}
           </Text>
 
           <Text style={styles.userEmail}>{user?.email}</Text>
@@ -252,22 +268,6 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.gray[200],
   },
 
-  avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-
-  avatarText: {
-    fontSize: FONT_SIZES['3xl'],
-    color: COLORS.white,
-    fontWeight: 'bold',
-  },
-
   userName: {
     fontSize: FONT_SIZES.xl,
     fontWeight: 'bold',
@@ -404,5 +404,28 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
     marginTop: SPACING.xl,
+  },
+
+  avatarContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+    overflow: 'hidden',  // ✅ Importante
+  },
+  
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  
+  avatarText: {
+    fontSize: FONT_SIZES['4xl'],
+    color: COLORS.white,
+    fontWeight: 'bold',
   },
 });

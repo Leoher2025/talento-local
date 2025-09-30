@@ -44,7 +44,7 @@ class ProfileModel {
         'bio',
         'profile_picture_url',
         'city',
-        'state',
+        'department',
         'address',
         'skills',
         'experience',

@@ -139,7 +139,7 @@ export const AuthProvider = ({ children }) => {
         // Guardar tokens y datos del usuario
         await AsyncStorage.setItem('accessToken', response.data.tokens.accessToken);
         await AsyncStorage.setItem('refreshToken', response.data.tokens.refreshToken);
-        
+
         // Reestructurar los datos del usuario similar al login
         const userDataFormatted = {
           id: response.data.user.id,
@@ -152,7 +152,7 @@ export const AuthProvider = ({ children }) => {
           profile_picture_url: null,
           profile: response.data.user.profile
         };
-        
+
         await AsyncStorage.setItem('userData', JSON.stringify(userDataFormatted));
 
         setUser(userDataFormatted);
@@ -221,12 +221,12 @@ export const AuthProvider = ({ children }) => {
         ...user,
         ...updatedUserData
       };
-      
+
       setUser(newUserData);
-      
+
       // Guardar en almacenamiento local
       await AsyncStorage.setItem('userData', JSON.stringify(newUserData));
-      
+
       console.log('Usuario actualizado:', newUserData);
       return true;
     } catch (error) {
@@ -238,24 +238,31 @@ export const AuthProvider = ({ children }) => {
   // Recargar datos del usuario desde el servidor
   const refreshUserData = async () => {
     try {
+      console.log('🔄 refreshUserData: Iniciando...');
       const response = await authService.getProfile();
-      
+      console.log('📥 refreshUserData: Respuesta:', JSON.stringify(response, null, 2));
+
       if (response.success) {
         const userData = {
           ...user,
           ...response.data.user,
-          profile: response.data.profile
+          profile: response.data.profile,
+          // ✅ Asegurarse de que profile_picture_url esté en el nivel superior
+          profile_picture_url: response.data.profile?.profile_picture_url || response.data.user?.profile_picture_url,
+          first_name: response.data.profile?.first_name || response.data.user?.first_name,
+          last_name: response.data.profile?.last_name || response.data.user?.last_name,
         };
-        
+
+        console.log('💾 refreshUserData: Guardando userData:', JSON.stringify(userData, null, 2));
         setUser(userData);
         await AsyncStorage.setItem('userData', JSON.stringify(userData));
-        
+
         return true;
       }
-      
+
       return false;
     } catch (error) {
-      console.error('Error recargando datos del usuario:', error);
+      console.error('❌ refreshUserData error:', error);
       return false;
     }
   };
@@ -266,7 +273,7 @@ export const AuthProvider = ({ children }) => {
     user,
     isLoading,
     isAuthenticated,
-    
+
     // Funciones
     login,
     register,

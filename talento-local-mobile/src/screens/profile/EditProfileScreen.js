@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
-import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES, API_URL } from '../../utils/constants';
+import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES, API_URL, STATIC_URL } from '../../utils/constants';
 import Toast from 'react-native-toast-message';
 import userService from '../../services/userService';
 
@@ -32,7 +32,7 @@ export default function EditProfileScreen({ navigation }) {
   console.log('updateUser existe?:', 'updateUser' in (useAuth || {}));
   console.log('=== FIN DEBUG ===');*/
 
-  const { user } = useAuth();
+  const { user, refreshUserData } = useAuth();
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -80,7 +80,7 @@ export default function EditProfileScreen({ navigation }) {
       if (profilePicUrl) {
         const imageUrl = profilePicUrl.startsWith('http')
           ? profilePicUrl
-          : `${API_URL}${profilePicUrl}`;
+          : `${STATIC_URL}${profilePicUrl}`;
         setProfileImage(imageUrl);
       }
     } catch (error) {
@@ -152,33 +152,29 @@ export default function EditProfileScreen({ navigation }) {
     try {
       setIsSaving(true);
       console.log('Subiendo imagen:', imageUri);
-      console.log('EditProfileScreen.js 1')
+
       const response = await userService.uploadProfilePicture(imageUri);
-      console.log('EditProfileScreen.js 2')
+
       if (response.success) {
         Toast.show({
           type: 'success',
           text1: 'Foto actualizada',
           text2: 'Tu foto de perfil se ha actualizado',
         });
-        console.log('EditProfileScreen.js 3')
-        // Usar la URL completa si está disponible, si no construirla
+
+        // Construir URL completa
         const imageUrl = response.data.fullUrl ||
           (response.data.url.startsWith('http')
             ? response.data.url
-            : `${API_URL}${response.data.url}`);
+            : `${STATIC_URL}${response.data.url}`);
 
         setProfileImage(imageUrl);
-        setHasChanges(true);
 
-        if (updateUser) {
-          updateUser({
-            ...user,
-            profile_picture_url: response.data.url,
-          });
-        }
-        console.log('EditProfileScreen.js 4')
-        console.log('Imagen subida exitosamente:', imageUrl);
+        // ✅ Recargar datos del servidor
+        await refreshUserData();
+
+        setHasChanges(true);
+        console.log('Imagen subida y perfil actualizado exitosamente');
       }
     } catch (error) {
       console.error('Error subiendo foto:', error);
@@ -187,6 +183,7 @@ export default function EditProfileScreen({ navigation }) {
         text1: 'Error',
         text2: error.message || 'No se pudo subir la foto',
       });
+
       // Revertir a la imagen anterior si hay error
       const fallbackUrl = user?.profile?.profile_picture_url || user?.profile_picture_url;
       if (fallbackUrl) {
@@ -228,7 +225,7 @@ export default function EditProfileScreen({ navigation }) {
         phone: formData.phone.trim(),
         bio: formData.bio.trim(),
         city: formData.city.trim(),
-        state: formData.state.trim(),
+        department: formData.state.trim(),
         address: formData.address.trim(),
       };
 
@@ -242,22 +239,16 @@ export default function EditProfileScreen({ navigation }) {
       const response = await userService.updateProfile(profileData);
 
       if (response.success) {
+        // ✅ Recargar datos del servidor
+        await refreshUserData();
+
         Toast.show({
           type: 'success',
           text1: 'Perfil actualizado',
           text2: 'Tus datos se han guardado correctamente',
         });
 
-        // Si hubo cambios en la imagen, informar que necesita recargar
-        if (hasChanges) {
-          Alert.alert(
-            'Perfil Actualizado',
-            'Tu perfil se ha actualizado correctamente. Los cambios se reflejarán la próxima vez que inicies sesión.',
-            [{ text: 'OK', onPress: () => navigation.goBack() }]
-          );
-        } else {
-          navigation.goBack();
-        }
+        navigation.goBack();
       }
     } catch (error) {
       console.error('Error guardando perfil:', error);

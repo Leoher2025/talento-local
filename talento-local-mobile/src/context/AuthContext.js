@@ -78,7 +78,6 @@ export const AuthProvider = ({ children }) => {
         // Guardar tokens y datos del usuario
         await AsyncStorage.setItem('accessToken', response.data.tokens.accessToken);
         await AsyncStorage.setItem('refreshToken', response.data.tokens.refreshToken);
-        //await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
 
         // Reestructurar los datos del usuario para un acceso más fácil
         const userData = {
@@ -140,9 +139,23 @@ export const AuthProvider = ({ children }) => {
         // Guardar tokens y datos del usuario
         await AsyncStorage.setItem('accessToken', response.data.tokens.accessToken);
         await AsyncStorage.setItem('refreshToken', response.data.tokens.refreshToken);
-        await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+        
+        // Reestructurar los datos del usuario similar al login
+        const userDataFormatted = {
+          id: response.data.user.id,
+          email: response.data.user.email,
+          phone: response.data.user.phone,
+          role: response.data.user.role,
+          verificationStatus: response.data.user.verificationStatus,
+          first_name: userData.firstName || '',
+          last_name: userData.lastName || '',
+          profile_picture_url: null,
+          profile: response.data.user.profile
+        };
+        
+        await AsyncStorage.setItem('userData', JSON.stringify(userDataFormatted));
 
-        setUser(response.data.user);
+        setUser(userDataFormatted);
         setIsAuthenticated(true);
 
         Toast.show({
@@ -201,23 +214,65 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Actualizar datos del usuario
-  const updateUser = async (userData) => {
+  const updateUser = async (updatedUserData) => {
     try {
-      setUser(userData);
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      // Actualizar el estado del usuario con los nuevos datos
+      const newUserData = {
+        ...user,
+        ...updatedUserData
+      };
+      
+      setUser(newUserData);
+      
+      // Guardar en almacenamiento local
+      await AsyncStorage.setItem('userData', JSON.stringify(newUserData));
+      
+      console.log('Usuario actualizado:', newUserData);
+      return true;
     } catch (error) {
       console.error('Error actualizando usuario:', error);
+      return false;
     }
   };
 
+  // Recargar datos del usuario desde el servidor
+  const refreshUserData = async () => {
+    try {
+      const response = await authService.getProfile();
+      
+      if (response.success) {
+        const userData = {
+          ...user,
+          ...response.data.user,
+          profile: response.data.profile
+        };
+        
+        setUser(userData);
+        await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error recargando datos del usuario:', error);
+      return false;
+    }
+  };
+
+  // Valor del contexto que se exporta
   const value = {
+    // Estados
     user,
     isLoading,
     isAuthenticated,
+    
+    // Funciones
     login,
     register,
     logout,
     updateUser,
+    refreshUserData,
     checkAuthState
   };
 

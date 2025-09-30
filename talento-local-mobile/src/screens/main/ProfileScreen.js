@@ -11,25 +11,44 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES } from '../../utils/constants';
-import Toast from 'react-native-toast-message';
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
 
   const handleEditProfile = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Próximamente',
-      text2: 'Esta función estará disponible pronto',
+    navigation.navigate('EditProfile');
+  };
+
+  const handleChangePassword = () => {
+    navigation.navigate('ChangePassword');
+  };
+
+  const handleTerms = () => {
+    navigation.navigate('StaticContent', {
+      type: 'terms',
+      title: 'Términos y Condiciones'
     });
   };
 
-  const handleChangePassword = async () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Próximamente',
-      text2: 'Esta función estará disponible pronto',
+  const handlePrivacy = () => {
+    navigation.navigate('StaticContent', {
+      type: 'privacy',
+      title: 'Política de Privacidad'
+    });
+  };
+
+  const handleHelp = () => {
+    navigation.navigate('StaticContent', {
+      type: 'help',
+      title: 'Ayuda y Soporte'
+    });
+  };
+
+  const handleAbout = () => {
+    navigation.navigate('StaticContent', {
+      type: 'about',
+      title: 'Acerca de'
     });
   };
 
@@ -61,17 +80,17 @@ export default function ProfileScreen({ navigation }) {
               {user?.profile?.firstName?.[0]?.toUpperCase() || '👤'}
             </Text>
           </View>
-          
+
           <Text style={styles.userName}>
             {user?.profile?.firstName} {user?.profile?.lastName}
           </Text>
-          
+
           <Text style={styles.userEmail}>{user?.email}</Text>
-          
+
           <View style={[styles.badge, { backgroundColor: verificationBadge.color }]}>
             <Text style={styles.badgeText}>{verificationBadge.text}</Text>
           </View>
-          
+
           <View style={styles.roleContainer}>
             <Text style={styles.roleText}>
               {user?.role === USER_ROLES.WORKER ? '🔧 Trabajador' : '🏠 Cliente'}
@@ -109,7 +128,7 @@ export default function ProfileScreen({ navigation }) {
         {/* Opciones del Perfil */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Configuración</Text>
-          
+
           <TouchableOpacity
             style={styles.menuItem}
             onPress={handleEditProfile}
@@ -119,7 +138,7 @@ export default function ProfileScreen({ navigation }) {
             <Text style={styles.menuText}>Editar Perfil</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={styles.menuItem}
             onPress={handleChangePassword}
@@ -129,7 +148,7 @@ export default function ProfileScreen({ navigation }) {
             <Text style={styles.menuText}>Cambiar Contraseña</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
-          
+
           <View style={styles.menuItem}>
             <Text style={styles.menuIcon}>🔔</Text>
             <Text style={styles.menuText}>Notificaciones</Text>
@@ -144,37 +163,48 @@ export default function ProfileScreen({ navigation }) {
 
         {/* Más Opciones */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Más</Text>
-          
+          <TouchableOpacity
+            onPress={() => navigation.navigate('StaticContent', {
+              type: 'help',
+              title: 'Ayuda y Soporte'
+            })}
+          >
+            {/* ... */}
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.menuItem}
+            onPress={handleHelp}
             activeOpacity={0.7}
           >
             <Text style={styles.menuIcon}>❓</Text>
             <Text style={styles.menuText}>Ayuda y Soporte</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={styles.menuItem}
+            onPress={handleTerms}
             activeOpacity={0.7}
           >
             <Text style={styles.menuIcon}>📄</Text>
             <Text style={styles.menuText}>Términos y Condiciones</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={styles.menuItem}
+            onPress={handlePrivacy}
             activeOpacity={0.7}
           >
             <Text style={styles.menuIcon}>🔒</Text>
             <Text style={styles.menuText}>Política de Privacidad</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={styles.menuItem}
+            onPress={handleAbout}
             activeOpacity={0.7}
           >
             <Text style={styles.menuIcon}>ℹ️</Text>
@@ -207,12 +237,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  
+
   scrollContent: {
     flexGrow: 1,
     paddingBottom: SPACING.xl,
   },
-  
+
   profileHeader: {
     backgroundColor: COLORS.white,
     paddingVertical: SPACING.xl,
@@ -221,7 +251,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray[200],
   },
-  
+
   avatarContainer: {
     width: 80,
     height: 80,
@@ -231,48 +261,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  
+
   avatarText: {
     fontSize: FONT_SIZES['3xl'],
     color: COLORS.white,
     fontWeight: 'bold',
   },
-  
+
   userName: {
     fontSize: FONT_SIZES.xl,
     fontWeight: 'bold',
     color: COLORS.text.primary,
     marginBottom: SPACING.xs,
   },
-  
+
   userEmail: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
     marginBottom: SPACING.sm,
   },
-  
+
   badge: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.full,
     marginBottom: SPACING.sm,
   },
-  
+
   badgeText: {
     color: COLORS.white,
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
   },
-  
+
   roleContainer: {
     marginTop: SPACING.xs,
   },
-  
+
   roleText: {
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
   },
-  
+
   statsSection: {
     backgroundColor: COLORS.white,
     marginTop: SPACING.md,
@@ -281,29 +311,29 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray[200],
   },
-  
+
   statsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginTop: SPACING.md,
   },
-  
+
   statItem: {
     alignItems: 'center',
   },
-  
+
   statValue: {
     fontSize: FONT_SIZES['2xl'],
     fontWeight: 'bold',
     color: COLORS.primary,
     marginBottom: SPACING.xs,
   },
-  
+
   statLabel: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
   },
-  
+
   section: {
     backgroundColor: COLORS.white,
     marginTop: SPACING.md,
@@ -311,7 +341,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray[200],
   },
-  
+
   sectionTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '600',
@@ -319,7 +349,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     paddingHorizontal: SPACING.lg,
   },
-  
+
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -328,23 +358,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray[100],
   },
-  
+
   menuIcon: {
     fontSize: FONT_SIZES.xl,
     marginRight: SPACING.md,
   },
-  
+
   menuText: {
     flex: 1,
     fontSize: FONT_SIZES.base,
     color: COLORS.text.primary,
   },
-  
+
   menuArrow: {
     fontSize: FONT_SIZES.lg,
     color: COLORS.gray[400],
   },
-  
+
   logoutButton: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -357,18 +387,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.error,
   },
-  
+
   logoutIcon: {
     fontSize: FONT_SIZES.xl,
     marginRight: SPACING.sm,
   },
-  
+
   logoutText: {
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
     color: COLORS.error,
   },
-  
+
   versionText: {
     textAlign: 'center',
     fontSize: FONT_SIZES.sm,

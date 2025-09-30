@@ -12,7 +12,12 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import HomeScreen from '../screens/main/HomeScreen';
+
+//Pantallas de perfiles de usuarios
 import ProfileScreen from '../screens/main/ProfileScreen';
+import EditProfileScreen from '../screens/profile/EditProfileScreen';
+import ChangePasswordScreen from '../screens/profile/ChangePasswordScreen';
+import StaticContentScreen from '../screens/static/StaticContentScreen';
 
 // Pantallas de trabajos
 import JobsListScreen from '../screens/jobs/JobsListScreen';
@@ -107,6 +112,30 @@ const MainStack = () => {
         component={ProfileScreen}
         options={{
           title: 'Mi Perfil',
+        }}
+      />
+      <Stack.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{
+          title: 'Editar Perfil',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="ChangePassword"
+        component={ChangePasswordScreen}
+        options={{
+          title: 'Cambiar Contraseña',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="StaticContent"
+        component={StaticContentScreen}
+        options={{
+          title: 'Información',
+          headerShown: false,
         }}
       />
       <Stack.Screen

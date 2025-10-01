@@ -63,7 +63,7 @@ class JobModel {
 
         // 2. Insertar imágenes si hay
         if (images.length > 0) {
-          const imageValues = images.map((img, index) => 
+          const imageValues = images.map((img, index) =>
             `('${job.id}', '${img.url}', '${img.thumbnail || img.url}', '${img.caption || ''}', ${index})`
           ).join(',');
 
@@ -71,7 +71,7 @@ class JobModel {
             INSERT INTO job_images (job_id, image_url, thumbnail_url, caption, display_order)
             VALUES ${imageValues}
           `;
-          
+
           await client.query(imageQuery);
         }
 
@@ -158,7 +158,7 @@ class JobModel {
             ST_MakePoint(j.longitude, j.latitude)::geography,
             ST_MakePoint($${paramCount + 1}, $${paramCount + 2})::geography
           ) / 1000 as distance_km`;
-        
+
         distanceWhere = ` AND ST_DWithin(
           ST_MakePoint(j.longitude, j.latitude)::geography,
           ST_MakePoint($${paramCount + 1}, $${paramCount + 2})::geography,
@@ -285,7 +285,7 @@ class JobModel {
       `;
 
       const result = await query(selectQuery, [jobId]);
-      
+
       if (result.rows.length === 0) {
         return null;
       }
@@ -370,7 +370,7 @@ class JobModel {
 
       // Construir query de actualización
       const allowedFields = [
-        'title', 'description', 'category_id', 
+        'title', 'description', 'category_id',
         'budget_amount', 'budget_type',
         'address', 'address_details', 'city', 'department',
         'latitude', 'longitude', 'urgency', 'needed_date'
@@ -415,7 +415,7 @@ class JobModel {
   // ============================
   static async updateStatus(jobId, newStatus, userId) {
     try {
-      // Verificar permisos según el nuevo estado
+      // Obtener información del trabajo
       const jobCheck = await query(
         'SELECT client_id, assigned_worker_id, status FROM jobs WHERE id = $1',
         [jobId]
@@ -427,47 +427,60 @@ class JobModel {
 
       const job = jobCheck.rows[0];
 
-      // Validar transiciones de estado
+      // Validar transiciones de estado permitidas
       const validTransitions = {
+        'draft': ['active', 'cancelled'],
         'active': ['in_progress', 'cancelled'],
         'in_progress': ['completed', 'cancelled'],
         'completed': [],
-        'cancelled': [],
-        'draft': ['active', 'cancelled']
+        'cancelled': []
       };
 
-      if (!validTransitions[job.status].includes(newStatus)) {
+      if (!validTransitions[job.status]?.includes(newStatus)) {
         throw new Error(`No se puede cambiar de ${job.status} a ${newStatus}`);
       }
 
-      // Verificar permisos
-      if (newStatus === 'cancelled' && job.client_id !== userId) {
-        throw new Error('Solo el cliente puede cancelar el trabajo');
+      // Verificar permisos según el nuevo estado
+      if (newStatus === 'in_progress') {
+        // Solo el trabajador asignado puede iniciar el trabajo
+        if (job.assigned_worker_id !== userId) {
+          throw new Error('Solo el trabajador asignado puede iniciar el trabajo');
+        }
+      } else if (newStatus === 'completed') {
+        // Solo el CLIENTE puede marcar como completado
+        if (job.client_id !== userId) {
+          throw new Error('Solo el cliente puede marcar el trabajo como completado');
+        }
+      } else if (newStatus === 'cancelled') {
+        // Solo el cliente puede cancelar
+        if (job.client_id !== userId) {
+          throw new Error('Solo el cliente puede cancelar el trabajo');
+        }
       }
 
-      if (newStatus === 'completed' && job.assigned_worker_id !== userId) {
-        throw new Error('Solo el trabajador asignado puede marcar como completado');
-      }
-
-      // Actualizar estado
+      // Construir query de actualización
       let updateQuery = `
-        UPDATE jobs 
-        SET status = $1, updated_at = CURRENT_TIMESTAMP
-      `;
+      UPDATE jobs 
+      SET status = $1, updated_at = CURRENT_TIMESTAMP
+    `;
 
       const values = [newStatus, jobId];
 
-      // Agregar timestamps específicos
+      // Agregar timestamps específicos según el estado
       if (newStatus === 'completed') {
         updateQuery += ', completed_at = CURRENT_TIMESTAMP';
       } else if (newStatus === 'cancelled') {
         updateQuery += ', cancelled_at = CURRENT_TIMESTAMP';
+      } else if (newStatus === 'in_progress') {
+        updateQuery += ', started_at = CURRENT_TIMESTAMP';
       }
 
       updateQuery += ' WHERE id = $2 RETURNING *';
 
       const result = await query(updateQuery, values);
-      logger.info(`✅ Estado del trabajo ${jobId} cambiado a ${newStatus}`);
+
+      logger.info(`Estado del trabajo ${jobId} cambiado de ${job.status} a ${newStatus} por usuario ${userId}`);
+
       return result.rows[0];
     } catch (error) {
       logger.error('Error cambiando estado del trabajo:', error);
@@ -500,7 +513,7 @@ class JobModel {
 
       // Eliminar (las imágenes y aplicaciones se eliminan por CASCADE)
       await query('DELETE FROM jobs WHERE id = $1', [jobId]);
-      
+
       logger.info(`✅ Trabajo eliminado: ${jobId}`);
       return true;
     } catch (error) {

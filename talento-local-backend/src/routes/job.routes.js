@@ -58,9 +58,9 @@ router.put(
 
 // PATCH /api/jobs/:id/status - Cambiar estado del trabajo
 router.patch(
-  '/:id/status',
+  '/:jobId/status',
   authenticate,
-  JobController.updateStatus
+  JobController.updateJobStatus
 );
 
 // DELETE /api/jobs/:id - Eliminar trabajo (solo el dueño)

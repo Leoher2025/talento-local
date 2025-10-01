@@ -95,9 +95,9 @@ class JobController {
   static async getById(req, res, next) {
     try {
       const { id } = req.params;
-      
+
       const job = await JobModel.getById(id);
-      
+
       if (!job) {
         return res.status(404).json({
           success: false,
@@ -122,9 +122,9 @@ class JobController {
     try {
       const userId = req.user.id;
       const { status } = req.query;
-      
+
       const jobs = await JobModel.getByClientId(userId, status);
-      
+
       res.json({
         success: true,
         data: jobs
@@ -142,10 +142,10 @@ class JobController {
     try {
       const { id } = req.params;
       const clientId = req.user.id;
-      
+
       // Mapear campos de camelCase a snake_case para la BD
       const updateData = {};
-      
+
       if (req.body.title !== undefined) updateData.title = req.body.title;
       if (req.body.description !== undefined) updateData.description = req.body.description;
       if (req.body.category_id !== undefined) updateData.category_id = req.body.category_id;
@@ -187,74 +187,96 @@ class JobController {
       logger.info(`Trabajo ${id} actualizado por cliente ${clientId}`);
     } catch (error) {
       logger.error('Error actualizando trabajo:', error);
-      
+
       if (error.message.includes('permisos')) {
         return res.status(403).json({
           success: false,
           message: error.message
         });
       }
-      
+
       if (error.message.includes('no encontrado')) {
         return res.status(404).json({
           success: false,
           message: error.message
         });
       }
-      
+
       next(error);
     }
   }
 
   // ============================
-  // CAMBIAR ESTADO DEL TRABAJO
+  // ACTUALIZAR ESTADO DEL TRABAJO
   // ============================
-  static async updateStatus(req, res, next) {
+  static async updateJobStatus(req, res, next) {
     try {
-      const { id } = req.params;
+      const { jobId } = req.params;
       const { status } = req.body;
       const userId = req.user.id;
 
-      if (!status) {
-        return res.status(400).json({
+      // Obtener el trabajo
+      const job = await JobModel.getById(jobId);
+
+      if (!job) {
+        return res.status(404).json({
           success: false,
-          message: 'El estado es requerido'
+          message: 'Trabajo no encontrado'
         });
       }
 
-      const updatedJob = await JobModel.updateStatus(id, status, userId);
+      // Validaciones según el nuevo estado
+      if (status === 'in_progress') {
+        // Solo el trabajador asignado puede marcar como "en progreso"
+        if (userId !== job.assigned_worker_id) {
+          return res.status(403).json({
+            success: false,
+            message: 'Solo el trabajador asignado puede iniciar el trabajo'
+          });
+        }
+      } else if (status === 'completed') {
+        // ✅ CAMBIO: Solo el CLIENTE puede marcar como completado
+        if (userId !== job.client_id) {
+          return res.status(403).json({
+            success: false,
+            message: 'Solo el cliente puede marcar el trabajo como completado'
+          });
+        }
+
+        // Verificar que el trabajo esté en progreso
+        if (job.status !== 'in_progress') {
+          return res.status(400).json({
+            success: false,
+            message: 'El trabajo debe estar en progreso para marcarlo como completado'
+          });
+        }
+      } else if (status === 'cancelled') {
+        // Solo el cliente o admin pueden cancelar
+        if (userId !== job.client_id && req.user.role !== 'admin') {
+          return res.status(403).json({
+            success: false,
+            message: 'Solo el cliente puede cancelar el trabajo'
+          });
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'Estado inválido'
+        });
+      }
+
+      // Actualizar el estado
+      const updatedJob = await JobModel.updateStatus(jobId, status, userId);
 
       res.json({
         success: true,
-        message: `Trabajo ${status === 'completed' ? 'completado' : status === 'cancelled' ? 'cancelado' : 'actualizado'} exitosamente`,
+        message: `Trabajo marcado como ${status}`,
         data: updatedJob
       });
 
-      logger.info(`Estado del trabajo ${id} cambiado a ${status} por usuario ${userId}`);
+      logger.info(`Trabajo ${jobId} actualizado a estado: ${status}`);
     } catch (error) {
-      logger.error('Error cambiando estado del trabajo:', error);
-      
-      if (error.message.includes('permisos') || error.message.includes('Solo')) {
-        return res.status(403).json({
-          success: false,
-          message: error.message
-        });
-      }
-      
-      if (error.message.includes('no encontrado')) {
-        return res.status(404).json({
-          success: false,
-          message: error.message
-        });
-      }
-      
-      if (error.message.includes('No se puede cambiar')) {
-        return res.status(400).json({
-          success: false,
-          message: error.message
-        });
-      }
-      
+      logger.error('Error actualizando estado del trabajo:', error);
       next(error);
     }
   }
@@ -284,28 +306,28 @@ class JobController {
       logger.info(`Trabajo ${id} eliminado por cliente ${clientId}`);
     } catch (error) {
       logger.error('Error eliminando trabajo:', error);
-      
+
       if (error.message.includes('permisos')) {
         return res.status(403).json({
           success: false,
           message: error.message
         });
       }
-      
+
       if (error.message.includes('no encontrado')) {
         return res.status(404).json({
           success: false,
           message: error.message
         });
       }
-      
+
       if (error.message.includes('No se puede eliminar')) {
         return res.status(400).json({
           success: false,
           message: error.message
         });
       }
-      
+
       next(error);
     }
   }
@@ -316,7 +338,7 @@ class JobController {
   static async getCategories(req, res, next) {
     try {
       const { query } = require('../config/database');
-      
+
       const result = await query(`
         SELECT id, slug, name, description, icon, display_order
         FROM categories
@@ -333,6 +355,17 @@ class JobController {
       next(error);
     }
   }
+}
+// Función auxiliar para obtener etiquetas de estado en español
+function getStatusLabel(status) {
+  const labels = {
+    'active': 'activo',
+    'in_progress': 'en progreso',
+    'completed': 'completado',
+    'cancelled': 'cancelado',
+    'draft': 'borrador'
+  };
+  return labels[status] || status;
 }
 
 module.exports = JobController;

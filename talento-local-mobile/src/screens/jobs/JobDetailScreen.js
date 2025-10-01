@@ -18,7 +18,27 @@ import Toast from 'react-native-toast-message';
 import jobService from '../../services/jobService';
 import applicationService from '../../services/applicationService';
 import chatService from '../../services/chatService';
-import StarRating from '../../components/StarRating';
+
+// Componente de paso de estado
+function StatusStep({ icon, label, active, completed }) {
+  return (
+    <View style={styles.statusStep}>
+      <View style={[
+        styles.statusIcon,
+        active && styles.statusIconActive,
+        completed && styles.statusIconCompleted
+      ]}>
+        <Text style={styles.statusIconText}>{icon}</Text>
+      </View>
+      <Text style={[
+        styles.statusLabel,
+        (active || completed) && styles.statusLabelActive
+      ]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
 
 export default function JobDetailScreen({ route, navigation }) {
   const { jobId } = route.params;
@@ -26,6 +46,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const [job, setJob] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isApplying, setIsApplying] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   useEffect(() => {
     loadJobDetail();
@@ -50,7 +71,7 @@ export default function JobDetailScreen({ route, navigation }) {
     }
   };
 
-  const handleDelete = () => {
+    const handleDelete = () => {
     Alert.alert(
       'Eliminar trabajo',
       '¿Estás seguro de que quieres eliminar este trabajo?',
@@ -73,42 +94,6 @@ export default function JobDetailScreen({ route, navigation }) {
                 type: 'error',
                 text1: 'Error',
                 text2: 'No se pudo eliminar el trabajo',
-              });
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleStatusChange = (newStatus) => {
-    const statusText = {
-      completed: 'completar',
-      cancelled: 'cancelar',
-      in_progress: 'marcar en progreso',
-    };
-
-    Alert.alert(
-      `¿${statusText[newStatus]} trabajo?`,
-      `¿Estás seguro de que quieres ${statusText[newStatus]} este trabajo?`,
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Sí',
-          onPress: async () => {
-            try {
-              await jobService.updateJobStatus(jobId, newStatus);
-              Toast.show({
-                type: 'success',
-                text1: 'Estado actualizado',
-                text2: `El trabajo ha sido ${statusText[newStatus]}`,
-              });
-              loadJobDetail(); // Recargar para ver el nuevo estado
-            } catch (error) {
-              Toast.show({
-                type: 'error',
-                text1: 'Error',
-                text2: error.message || 'No se pudo cambiar el estado',
               });
             }
           },
@@ -190,6 +175,56 @@ export default function JobDetailScreen({ route, navigation }) {
       console.error('Error abriendo chat:', error);
       Alert.alert('Error', 'No se pudo abrir el chat');
     }
+  };
+
+  const getStatusLabel = (status) => {
+    const labels = {
+      'active': 'activo',
+      'in_progress': 'en progreso',
+      'completed': 'completado',
+      'cancelled': 'cancelado',
+      'draft': 'borrador'
+    };
+    return labels[status] || status;
+  };
+
+  const handleStatusChange = (newStatus) => {
+    const statusText = {
+      completed: 'completar',
+      cancelled: 'cancelar',
+      in_progress: 'marcar en progreso',
+    };
+
+    Alert.alert(
+      `¿${statusText[newStatus]} trabajo?`,
+      `¿Estás seguro de que quieres ${statusText[newStatus]} este trabajo?`,
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Sí',
+          onPress: async () => {
+            try {
+              setIsUpdatingStatus(true); // ✅ AGREGAR
+              await jobService.updateJobStatus(jobId, newStatus);
+              Toast.show({
+                type: 'success',
+                text1: 'Estado actualizado',
+                text2: `El trabajo ha sido ${statusText[newStatus]}`,
+              });
+              loadJobDetail(); // Recargar para ver el nuevo estado
+            } catch (error) {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error.message || 'No se pudo cambiar el estado',
+              });
+            } finally {
+              setIsUpdatingStatus(false); // ✅ AGREGAR
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleOpenMap = () => {
@@ -284,6 +319,70 @@ export default function JobDetailScreen({ route, navigation }) {
     });
   };
 
+  const handleCompleteConfirmation = () => {
+    Alert.alert(
+      'Marcar como Completado',
+      '¿Estás seguro de que el trabajo ha sido completado satisfactoriamente? Una vez marcado, podrás dejar una calificación.',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel'
+        },
+        {
+          text: 'Sí, Completado',
+          onPress: () => handleStatusChange('completed'),
+          style: 'default'
+        }
+      ]
+    );
+  };
+
+  const handleCancelConfirmation = () => {
+    Alert.alert(
+      'Cancelar Trabajo',
+      '¿Estás seguro de que deseas cancelar este trabajo?',
+      [
+        {
+          text: 'No',
+          style: 'cancel'
+        },
+        {
+          text: 'Sí, Cancelar',
+          onPress: () => handleStatusChange('cancelled'),
+          style: 'destructive'
+        }
+      ]
+    );
+  };
+
+  const handleStartChat = async (otherUserId) => {
+    try {
+      // Crear o obtener conversación
+      const conversationData = {
+        jobId: job.id,
+        clientId: job.client_id,
+        workerId: job.assigned_worker_id
+      };
+
+      const response = await chatService.getOrCreateConversation(conversationData);
+
+      if (response.success) {
+        navigation.navigate('ChatScreen', {
+          conversationId: response.data.id,
+          otherUserId: otherUserId,
+          jobId: job.id
+        });
+      }
+    } catch (error) {
+      console.error('Error iniciando chat:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudo iniciar el chat',
+      });
+    }
+  };
+
   // Determinar si el usuario es el dueño del trabajo
   const isOwner = user?.id === job?.client_id;
   const isWorker = user?.role === USER_ROLES.WORKER;
@@ -330,8 +429,27 @@ export default function JobDetailScreen({ route, navigation }) {
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
 
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) }]}>
-            <Text style={styles.statusText}>{getStatusText(job.status)}</Text>
+          <View style={styles.statusFlow}>
+            <StatusStep
+              icon="📝"
+              label="Publicado"
+              active={true}
+              completed={['active', 'in_progress', 'completed'].includes(job.status)}
+            />
+            <View style={styles.statusLine} />
+            <StatusStep
+              icon="🚀"
+              label="En Progreso"
+              active={job.status === 'in_progress'}
+              completed={job.status === 'completed'}
+            />
+            <View style={styles.statusLine} />
+            <StatusStep
+              icon="✓"
+              label="Completado"
+              active={job.status === 'completed'}
+              completed={job.status === 'completed'}
+            />
           </View>
         </View>
 
@@ -467,8 +585,22 @@ export default function JobDetailScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Acciones según el rol y estado */}
+        {/* Botones de acción según estado y rol */}
         <View style={styles.actionsSection}>
+          {/* TRABAJADOR: Aplicar al trabajo */}
+          {job.status === 'active' &&
+            isWorker &&
+            !isOwner &&
+            !job.assigned_worker_id && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.primaryButton]}
+                onPress={() => navigation.navigate('Applications', { jobId: job.id })}
+              >
+                <Text style={styles.actionButtonIcon}>📝</Text>
+                <Text style={styles.actionButtonText}>Aplicar al Trabajo</Text>
+              </TouchableOpacity>
+            )}
+
           {isOwner ? (
             // Acciones para el dueño del trabajo
             <>
@@ -506,8 +638,13 @@ export default function JobDetailScreen({ route, navigation }) {
                   <TouchableOpacity
                     style={[styles.actionButton, styles.successButton]}
                     onPress={() => handleStatusChange('completed')}
+                    disabled={isUpdatingStatus}
                   >
-                    <Text style={styles.successButtonText}>✅ Marcar como Completado</Text>
+                    {isUpdatingStatus ? (
+                      <ActivityIndicator color={COLORS.white} />
+                    ) : (
+                      <Text style={styles.successButtonText}>✅ Marcar como Completado</Text>
+                    )}
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -523,8 +660,29 @@ export default function JobDetailScreen({ route, navigation }) {
                 <TouchableOpacity
                   style={[styles.actionButton, styles.warningButton]}
                   onPress={() => handleStatusChange('cancelled')}
+                  disabled={isUpdatingStatus}
                 >
-                  <Text style={styles.warningButtonText}>❌ Cancelar Trabajo</Text>
+                  {isUpdatingStatus ? (
+                    <ActivityIndicator color={COLORS.warning} />
+                  ) : (
+                    <Text style={styles.warningButtonText}>❌ Cancelar Trabajo</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              {/* ✅ Botón para calificar trabajador - CLIENTE */}
+              {job.status === 'completed' && job.assigned_worker_id && (
+                <TouchableOpacity
+                  style={styles.reviewButton}
+                  onPress={() => navigation.navigate('CreateReview', {
+                    jobId: job.id,
+                    revieweeId: job.assigned_worker_id,
+                    revieweeName: `${job.worker_first_name} ${job.worker_last_name}`,
+                    reviewType: 'worker_review'
+                  })}
+                >
+                  <Text style={styles.reviewButtonIcon}>⭐</Text>
+                  <Text style={styles.reviewButtonText}>Calificar Trabajador</Text>
                 </TouchableOpacity>
               )}
             </>
@@ -563,24 +721,8 @@ export default function JobDetailScreen({ route, navigation }) {
                 </TouchableOpacity>
               )}
 
-              {/* Botón para calificar (solo si el trabajo está completado y es el cliente) */}
-              {job.status === 'completed' && user?.id === job.client_id && job.assigned_worker_id && (
-                <TouchableOpacity
-                  style={styles.reviewButton}
-                  onPress={() => navigation.navigate('CreateReview', {
-                    jobId: job.id,
-                    revieweeId: job.assigned_worker_id,
-                    revieweeName: `${job.worker_first_name} ${job.worker_last_name}`,
-                    reviewType: 'worker_review'
-                  })}
-                >
-                  <Text style={styles.reviewButtonIcon}>⭐</Text>
-                  <Text style={styles.reviewButtonText}>Calificar Trabajador</Text>
-                </TouchableOpacity>
-              )}
-
-              {/* Botón para calificar al cliente (si es trabajador y el trabajo está completado) */}
-              {job.status === 'completed' && user?.id === job.assigned_worker_id && job.client_id && (
+              {/* ✅ Botón para calificar cliente - TRABAJADOR */}
+              {job.status === 'completed' && job.assigned_worker_id === user.id && job.client_id && (
                 <TouchableOpacity
                   style={styles.reviewButton}
                   onPress={() => navigation.navigate('CreateReview', {
@@ -899,20 +1041,6 @@ const styles = StyleSheet.create({
     color: COLORS.text.secondary,
   },
 
-  actionsSection: {
-    padding: SPACING.lg,
-    backgroundColor: COLORS.white,
-    marginTop: SPACING.lg,
-  },
-
-  actionButton: {
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-
   primaryButton: {
     backgroundColor: COLORS.primary,
   },
@@ -925,14 +1053,14 @@ const styles = StyleSheet.create({
 
   secondaryButton: {
     backgroundColor: COLORS.white,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.primary,
   },
 
   secondaryButtonText: {
-    color: COLORS.primary,
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
+    color: COLORS.primary,
   },
 
   successButton: {
@@ -1001,9 +1129,126 @@ const styles = StyleSheet.create({
     marginRight: SPACING.sm,
   },
 
-  reviewButtonText: {
+  actionsSection: {
+    padding: SPACING.lg,
+    gap: SPACING.md,
+  },
+
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  actionButtonIcon: {
+    fontSize: FONT_SIZES.xl,
+    marginRight: SPACING.sm,
+  },
+
+  actionButtonText: {
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
-    color: COLORS.warning,
+    color: COLORS.white,
+  },
+
+  startButton: {
+    backgroundColor: COLORS.primary,
+  },
+
+  completeButton: {
+    backgroundColor: COLORS.success,
+  },
+
+  cancelButton: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+
+  cancelButtonText: {
+    fontSize: FONT_SIZES.base,
+    fontWeight: '600',
+    color: COLORS.error,
+  },
+
+  reviewButton: {
+    backgroundColor: COLORS.warning + '20',
+    borderWidth: 1,
+    borderColor: COLORS.warning,
+  },
+
+  statusFlow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.lg,
+    backgroundColor: COLORS.white,
+    marginBottom: SPACING.md,
+  },
+
+  statusStep: {
+    alignItems: 'center',
+  },
+
+  statusIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.gray[200],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  },
+
+  statusIconActive: {
+    backgroundColor: COLORS.primary + '30',
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+
+  statusIconCompleted: {
+    backgroundColor: COLORS.success,
+  },
+
+  statusIconText: {
+    fontSize: FONT_SIZES.lg,
+  },
+
+  statusLabel: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.text.secondary,
+    textAlign: 'center',
+  },
+
+  statusLabelActive: {
+    color: COLORS.text.primary,
+    fontWeight: '600',
+  },
+
+  statusLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: COLORS.gray[200],
+    marginHorizontal: SPACING.xs,
+  },
+
+  chatButton: {
+    backgroundColor: COLORS.info + '20',
+    borderWidth: 1,
+    borderColor: COLORS.info,
+  },
+
+  chatButtonText: {
+    fontSize: FONT_SIZES.base,
+    fontWeight: '600',
+    color: COLORS.info,
   },
 });

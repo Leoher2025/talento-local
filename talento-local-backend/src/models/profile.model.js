@@ -23,7 +23,7 @@ class ProfileModel {
         INNER JOIN users u ON p.user_id = u.id
         WHERE p.user_id = $1
       `;
-      
+
       const result = await query(selectQuery, [userId]);
       return result.rows[0];
     } catch (error) {
@@ -81,7 +81,7 @@ class ProfileModel {
       `;
 
       const result = await query(updateQuery, values);
-      
+
       if (result.rows.length === 0) {
         throw new Error('Perfil no encontrado');
       }
@@ -107,7 +107,7 @@ class ProfileModel {
       `;
 
       const result = await query(updateQuery, [imageUrl, userId]);
-      
+
       if (result.rows.length === 0) {
         throw new Error('Perfil no encontrado');
       }
@@ -132,7 +132,7 @@ class ProfileModel {
       `;
 
       const result = await query(updateQuery, [userId]);
-      
+
       if (result.rows.length === 0) {
         throw new Error('Perfil no encontrado');
       }
@@ -199,7 +199,7 @@ class ProfileModel {
       `;
 
       const result = await query(deleteQuery, [photoId, userId]);
-      
+
       if (result.rows.length === 0) {
         throw new Error('Foto no encontrada o sin permisos');
       }
@@ -323,7 +323,7 @@ class ProfileModel {
       `;
 
       const result = await query(updateQuery, [phone, userId]);
-      
+
       if (result.rows.length === 0) {
         throw new Error('Usuario no encontrado');
       }
@@ -334,6 +334,44 @@ class ProfileModel {
       throw error;
     }
   }
+
+  // ============================
+  // Estadisticas
+  // ============================
+
+  static async getByUserId(userId) {
+    try {
+      const selectQuery = `
+      SELECT 
+        p.*,
+        u.email,
+        u.phone,
+        u.role,
+        u.verification_status,
+        u.is_active,
+        u.created_at as user_created_at,
+        -- Estadísticas de reviews
+        COALESCE(
+          (SELECT COUNT(*) FROM reviews WHERE reviewee_id = u.id),
+          0
+        ) as total_reviews,
+        COALESCE(
+          (SELECT ROUND(AVG(rating)::numeric, 2) FROM reviews WHERE reviewee_id = u.id),
+          0
+        ) as avg_rating
+      FROM profiles p
+      INNER JOIN users u ON p.user_id = u.id
+      WHERE p.user_id = $1
+    `;
+
+      const result = await query(selectQuery, [userId]);
+      return result.rows[0];
+    } catch (error) {
+      logger.error('Error obteniendo perfil:', error);
+      throw error;
+    }
+  }
+
 }
 
 module.exports = ProfileModel;

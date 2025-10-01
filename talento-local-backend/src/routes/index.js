@@ -11,6 +11,7 @@ const applicationRoutes = require('./application.routes');
 const chatRoutes = require('./chat.routes');
 // const userRoutes = require('./user.routes'); // Implementaremos después
 const profileRoutes = require('./profile.routes'); 
+const reviewRoutes = require('./review.routes');
 // const categoryRoutes = require('./category.routes'); // Implementaremos después
 
 // ============================
@@ -31,6 +32,9 @@ router.use('/chat', chatRoutes);
 
 // Rutas de perfiles
 router.use('/profiles', profileRoutes);
+
+// Rutas de calificaciones
+router.use('/reviews', reviewRoutes);
 
 // Rutas de categorías (próximo módulo)
 // router.use('/categories', categoryRoutes);

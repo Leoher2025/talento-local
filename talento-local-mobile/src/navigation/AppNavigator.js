@@ -35,6 +35,10 @@ import ManageApplicationsScreen from '../screens/main/ManageApplicationsScreen';
 import ConversationsScreen from '../screens/main/ConversationsScreen';
 import ChatScreen from '../screens/main/ChatScreen';
 
+// Pantallas de reviews
+import CreateReviewScreen from '../screens/reviews/CreateReviewScreen';
+import UserReviewsScreen from '../screens/reviews/UserReviewsScreen';
+
 const Stack = createNativeStackNavigator();
 
 // Stack de autenticación (usuarios no logueados)
@@ -214,6 +218,22 @@ const MainStack = () => {
         component={ChatScreen}
         options={{
           title: 'Chat',
+          headerShown: false
+        }}
+      />
+      <Stack.Screen
+        name="CreateReview"
+        component={CreateReviewScreen}
+        options={{
+          title: 'Calificar',
+          headerShown: false
+        }}
+      />
+      <Stack.Screen
+        name="UserReviews"
+        component={UserReviewsScreen}
+        options={{
+          title: 'Calificaciones',
           headerShown: false
         }}
       />

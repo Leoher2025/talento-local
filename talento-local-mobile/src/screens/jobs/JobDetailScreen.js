@@ -18,6 +18,7 @@ import Toast from 'react-native-toast-message';
 import jobService from '../../services/jobService';
 import applicationService from '../../services/applicationService';
 import chatService from '../../services/chatService';
+import StarRating from '../../components/StarRating';
 
 export default function JobDetailScreen({ route, navigation }) {
   const { jobId } = route.params;
@@ -48,26 +49,6 @@ export default function JobDetailScreen({ route, navigation }) {
       setIsLoading(false);
     }
   };
-
-  // Función para iniciar chat
-const handleStartChat = async () => {
-  try {
-    const response = await chatService.getOrCreateConversation({
-      jobId: job.id,
-      clientId: job.client_id,
-      workerId: user.id  // o viceversa según el rol
-    });
-    
-    navigation.navigate('ChatScreen', {
-      conversationId: response.data.id,
-      otherUser: {
-        // datos del otro usuario
-      }
-    });
-  } catch (error) {
-    Alert.alert('Error', 'No se pudo iniciar la conversación');
-  }
-};
 
   const handleDelete = () => {
     Alert.alert(
@@ -162,54 +143,54 @@ const handleStartChat = async () => {
     navigation.navigate('Applications', { jobId: job.id });
   };
 
-const handleContact = async () => {
-  try {
-    // Determinar los IDs según el rol
-    let clientId, workerId;
-    
-    if (isOwner) {
-      // Si es el dueño (cliente), contactar al trabajador asignado
-      if (!job.assigned_worker_id) {
-        Alert.alert('Info', 'No hay trabajador asignado a este trabajo');
+  const handleContact = async () => {
+    try {
+      // Determinar los IDs según el rol
+      let clientId, workerId;
+
+      if (isOwner) {
+        // Si es el dueño (cliente), contactar al trabajador asignado
+        if (!job.assigned_worker_id) {
+          Alert.alert('Info', 'No hay trabajador asignado a este trabajo');
+          return;
+        }
+        clientId = user.id;
+        workerId = job.assigned_worker_id;
+      } else if (isWorker) {
+        // Si es trabajador, contactar al cliente
+        clientId = job.client_id;
+        workerId = user.id;
+      } else {
+        Alert.alert('Error', 'No tienes permiso para contactar');
         return;
       }
-      clientId = user.id;
-      workerId = job.assigned_worker_id;
-    } else if (isWorker) {
-      // Si es trabajador, contactar al cliente
-      clientId = job.client_id;
-      workerId = user.id;
-    } else {
-      Alert.alert('Error', 'No tienes permiso para contactar');
-      return;
+
+      console.log("Creando conversación:", {
+        jobId: job.id,
+        clientId: clientId,
+        workerId: workerId
+      });
+
+      // Obtener o crear conversación - CORREGIDO
+      const response = await chatService.getOrCreateConversation(
+        job.id,
+        clientId,
+        workerId
+      );
+
+      // Navegar al chat
+      navigation.navigate('ChatScreen', {
+        conversationId: response.data.id,
+        otherUserName: isOwner
+          ? `${job.worker_first_name} ${job.worker_last_name}`
+          : `${job.client_first_name} ${job.client_last_name}`,
+        jobTitle: job.title
+      });
+    } catch (error) {
+      console.error('Error abriendo chat:', error);
+      Alert.alert('Error', 'No se pudo abrir el chat');
     }
-    
-    console.log("Creando conversación:", {
-      jobId: job.id,
-      clientId: clientId,
-      workerId: workerId
-    });
-    
-    // Obtener o crear conversación - CORREGIDO
-    const response = await chatService.getOrCreateConversation(
-      job.id,
-      clientId,
-      workerId
-    );
-    
-    // Navegar al chat
-    navigation.navigate('ChatScreen', {
-      conversationId: response.data.id,
-      otherUserName: isOwner 
-        ? `${job.worker_first_name} ${job.worker_last_name}`
-        : `${job.client_first_name} ${job.client_last_name}`,
-      jobTitle: job.title
-    });
-  } catch (error) {
-    console.error('Error abriendo chat:', error);
-    Alert.alert('Error', 'No se pudo abrir el chat');
-  }
-};
+  };
 
   const handleOpenMap = () => {
     // Abrir la ubicación en el mapa
@@ -579,6 +560,38 @@ const handleContact = async () => {
                   onPress={handleContact}
                 >
                   <Text style={styles.secondaryButtonText}>💬 Contactar Cliente</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Botón para calificar (solo si el trabajo está completado y es el cliente) */}
+              {job.status === 'completed' && user?.id === job.client_id && job.assigned_worker_id && (
+                <TouchableOpacity
+                  style={styles.reviewButton}
+                  onPress={() => navigation.navigate('CreateReview', {
+                    jobId: job.id,
+                    revieweeId: job.assigned_worker_id,
+                    revieweeName: `${job.worker_first_name} ${job.worker_last_name}`,
+                    reviewType: 'worker_review'
+                  })}
+                >
+                  <Text style={styles.reviewButtonIcon}>⭐</Text>
+                  <Text style={styles.reviewButtonText}>Calificar Trabajador</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Botón para calificar al cliente (si es trabajador y el trabajo está completado) */}
+              {job.status === 'completed' && user?.id === job.assigned_worker_id && job.client_id && (
+                <TouchableOpacity
+                  style={styles.reviewButton}
+                  onPress={() => navigation.navigate('CreateReview', {
+                    jobId: job.id,
+                    revieweeId: job.client_id,
+                    revieweeName: `${job.client_first_name} ${job.client_last_name}`,
+                    reviewType: 'client_review'
+                  })}
+                >
+                  <Text style={styles.reviewButtonIcon}>⭐</Text>
+                  <Text style={styles.reviewButtonText}>Calificar Cliente</Text>
                 </TouchableOpacity>
               )}
             </>
@@ -968,5 +981,29 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
+  },
+
+  reviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.warning + '20',
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.warning,
+  },
+
+  reviewButtonIcon: {
+    fontSize: FONT_SIZES.xl,
+    marginRight: SPACING.sm,
+  },
+
+  reviewButtonText: {
+    fontSize: FONT_SIZES.base,
+    fontWeight: '600',
+    color: COLORS.warning,
   },
 });

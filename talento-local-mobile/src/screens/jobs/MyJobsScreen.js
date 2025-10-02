@@ -1,4 +1,4 @@
-// src/screens/jobs/MyJobsScreen.js - Pantalla para ver mis trabajos publicados (cliente)
+// src/screens/jobs/MyJobsScreen.js - Pantalla para ver mis trabajos (cliente/trabajador)
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -12,7 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
-import { COLORS, FONT_SIZES, SPACING, RADIUS } from '../../utils/constants';
+import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES } from '../../utils/constants';
 import Toast from 'react-native-toast-message';
 import jobService from '../../services/jobService';
 
@@ -21,7 +21,9 @@ export default function MyJobsScreen({ navigation }) {
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedTab, setSelectedTab] = useState('active');
+  const [selectedTab, setSelectedTab] = useState('all');
+
+  const isWorker = user?.role === USER_ROLES.WORKER;
 
   useEffect(() => {
     loadJobs();
@@ -32,16 +34,27 @@ export default function MyJobsScreen({ navigation }) {
       if (refresh) setIsRefreshing(true);
       else setIsLoading(true);
 
-      const myJobs = await jobService.getMyJobs(
-        selectedTab === 'all' ? null : selectedTab
-      );
-      setJobs(myJobs);
+      let myJobs;
+
+      if (isWorker) {
+        // Para trabajadores: obtener trabajos asignados
+        myJobs = await jobService.getMyAssignedJobs(
+          selectedTab === 'all' ? null : selectedTab
+        );
+      } else {
+        // Para clientes: obtener trabajos publicados
+        myJobs = await jobService.getMyJobs(
+          selectedTab === 'all' ? null : selectedTab
+        );
+      }
+
+      setJobs(myJobs || []);
     } catch (error) {
-      console.error('Error cargando mis trabajos:', error);
+      console.error('Error cargando trabajos:', error);
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'No se pudieron cargar tus trabajos',
+        text2: 'No se pudieron cargar los trabajos',
       });
     } finally {
       setIsLoading(false);
@@ -88,6 +101,7 @@ export default function MyJobsScreen({ navigation }) {
     const statusText = {
       completed: 'completar',
       cancelled: 'cancelar',
+      in_progress: 'iniciar',
     };
 
     Alert.alert(
@@ -103,7 +117,7 @@ export default function MyJobsScreen({ navigation }) {
               Toast.show({
                 type: 'success',
                 text1: 'Estado actualizado',
-                text2: `El trabajo ha sido ${newStatus === 'completed' ? 'completado' : 'cancelado'}`,
+                text2: `El trabajo ha sido ${statusText[newStatus]}`,
               });
               loadJobs();
             } catch (error) {
@@ -119,13 +133,18 @@ export default function MyJobsScreen({ navigation }) {
     );
   };
 
-  const getStatusColor = (status) => {
+  const getStatusStyle = (status) => {
     switch (status) {
-      case 'active': return COLORS.success;
-      case 'in_progress': return COLORS.info;
-      case 'completed': return COLORS.primary;
-      case 'cancelled': return COLORS.error;
-      default: return COLORS.gray[500];
+      case 'active':
+        return { backgroundColor: COLORS.success + '20' };
+      case 'in_progress':
+        return { backgroundColor: COLORS.info + '20' };
+      case 'completed':
+        return { backgroundColor: COLORS.primary + '20' };
+      case 'cancelled':
+        return { backgroundColor: COLORS.error + '20' };
+      default:
+        return { backgroundColor: COLORS.gray[200] };
     }
   };
 
@@ -169,9 +188,11 @@ export default function MyJobsScreen({ navigation }) {
       onPress={() => navigation.navigate('JobDetail', { jobId: item.id })}
       activeOpacity={0.7}
     >
-      {/* Estado */}
-      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-        <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+      {/* Header con estado */}
+      <View style={styles.jobHeader}>
+        <View style={[styles.statusBadge, getStatusStyle(item.status)]}>
+          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+        </View>
       </View>
 
       {/* Título y categoría */}
@@ -183,38 +204,60 @@ export default function MyJobsScreen({ navigation }) {
         <Text style={styles.categoryName}>{item.category_name}</Text>
       </View>
 
-      {/* Información */}
+      {/* Información del cliente (para trabajadores) */}
+      {isWorker && item.client_first_name && (
+        <View style={styles.clientInfo}>
+          <Text style={styles.clientLabel}>Cliente:</Text>
+          <Text style={styles.clientName}>
+            {item.client_first_name} {item.client_last_name}
+          </Text>
+          {item.client_rating && parseFloat(item.client_rating) > 0 && (
+            <Text style={styles.clientRating}>
+              ⭐ {parseFloat(item.client_rating).toFixed(1)}
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Información general */}
       <View style={styles.infoContainer}>
         <View style={styles.infoItem}>
           <Text style={styles.infoLabel}>Presupuesto:</Text>
           <Text style={styles.infoValue}>
             {item.budget_type === 'fixed'
-              ? `Q${item.budget_amount || '0'}`
+              ? `Q${parseFloat(item.budget_amount || 0).toFixed(2)}`
               : item.budget_type === 'hourly'
-              ? `Q${item.budget_amount || '0'}/hora`
-              : 'Negociable'}
+                ? `Q${parseFloat(item.budget_amount || 0).toFixed(2)}/hora`
+                : 'Negociable'}
           </Text>
         </View>
-        <View style={styles.infoItem}>
-          <Text style={styles.infoLabel}>Aplicaciones:</Text>
-          <Text style={styles.infoValue}>{item.applications_count || 0}</Text>
-        </View>
+        {!isWorker && (
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Aplicaciones:</Text>
+            <Text style={styles.infoValue}>{item.applications_count || 0}</Text>
+          </View>
+        )}
       </View>
+
+      {/* Ubicación */}
+      <Text style={styles.locationText}>
+        📍 {item.city}, {item.department}
+      </Text>
 
       {/* Fechas */}
       <View style={styles.dateContainer}>
         <Text style={styles.dateText}>
-          Publicado: {new Date(item.created_at).toLocaleDateString()}
+          Publicado: {new Date(item.created_at).toLocaleDateString('es-GT')}
         </Text>
         {item.completed_at && (
           <Text style={styles.dateText}>
-            Completado: {new Date(item.completed_at).toLocaleDateString()}
+            Completado: {new Date(item.completed_at).toLocaleDateString('es-GT')}
           </Text>
         )}
       </View>
 
-      {/* Acciones */}
-      {(item.status === 'active' || item.status === 'in_progress') && (
+      {/* Acciones para CLIENTES */}
+      {!isWorker && (item.status === 'active' || item.status === 'in_progress') && (
         <View style={styles.actionsContainer}>
           {item.status === 'active' && (
             <>
@@ -237,17 +280,27 @@ export default function MyJobsScreen({ navigation }) {
               style={[styles.actionButton, styles.completeButton]}
               onPress={() => handleStatusChange(item.id, 'completed', item.title)}
             >
-              <Text style={styles.completeButtonText}>✅ Marcar Completado</Text>
+              <Text style={styles.completeButtonText}>✅ Completar</Text>
             </TouchableOpacity>
           )}
-          {(item.status === 'active' || item.status === 'in_progress') && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.cancelButton]}
-              onPress={() => handleStatusChange(item.id, 'cancelled', item.title)}
-            >
-              <Text style={styles.cancelButtonText}>❌ Cancelar</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={[styles.actionButton, styles.cancelButton]}
+            onPress={() => handleStatusChange(item.id, 'cancelled', item.title)}
+          >
+            <Text style={styles.cancelButtonText}>❌ Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Acciones para TRABAJADORES */}
+      {isWorker && item.status === 'active' && (
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.startButton]}
+            onPress={() => handleStatusChange(item.id, 'in_progress', item.title)}
+          >
+            <Text style={styles.startButtonText}>🚀 Iniciar Trabajo</Text>
+          </TouchableOpacity>
         </View>
       )}
     </TouchableOpacity>
@@ -257,16 +310,22 @@ export default function MyJobsScreen({ navigation }) {
     <View style={styles.emptyState}>
       <Text style={styles.emptyIcon}>📋</Text>
       <Text style={styles.emptyTitle}>
-        {selectedTab === 'all' 
-          ? 'No has publicado ningún trabajo'
-          : `No tienes trabajos ${getStatusText(selectedTab).toLowerCase()}`}
+        {isWorker
+          ? selectedTab === 'all'
+            ? 'No tienes trabajos asignados'
+            : `No tienes trabajos ${getStatusText(selectedTab).toLowerCase()}`
+          : selectedTab === 'all'
+            ? 'No has publicado ningún trabajo'
+            : `No tienes trabajos ${getStatusText(selectedTab).toLowerCase()}`}
       </Text>
-      <TouchableOpacity
-        style={styles.createButton}
-        onPress={() => navigation.navigate('CreateJob')}
-      >
-        <Text style={styles.createButtonText}>Publicar mi primer trabajo</Text>
-      </TouchableOpacity>
+      {!isWorker && (
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => navigation.navigate('CreateJob')}
+        >
+          <Text style={styles.createButtonText}>Publicar mi primer trabajo</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -274,7 +333,9 @@ export default function MyJobsScreen({ navigation }) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Cargando tus trabajos...</Text>
+        <Text style={styles.loadingText}>
+          {isWorker ? 'Cargando tus trabajos asignados...' : 'Cargando tus trabajos...'}
+        </Text>
       </View>
     );
   }
@@ -300,14 +361,16 @@ export default function MyJobsScreen({ navigation }) {
         ListEmptyComponent={renderEmptyState}
       />
 
-      {/* Botón flotante */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('CreateJob')}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      {/* Botón flotante solo para clientes */}
+      {!isWorker && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => navigation.navigate('CreateJob')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.fabText}>+</Text>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
@@ -317,19 +380,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   loadingText: {
     marginTop: SPACING.md,
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
   },
-  
+
   tabsContainer: {
     flexDirection: 'row',
     backgroundColor: COLORS.white,
@@ -337,33 +400,33 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray[200],
   },
-  
+
   tab: {
     flex: 1,
     paddingVertical: SPACING.sm,
     alignItems: 'center',
   },
-  
+
   tabActive: {
     borderBottomWidth: 2,
     borderBottomColor: COLORS.primary,
   },
-  
+
   tabText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
   },
-  
+
   tabTextActive: {
     color: COLORS.primary,
     fontWeight: '600',
   },
-  
+
   listContent: {
     flexGrow: 1,
     padding: SPACING.md,
   },
-  
+
   jobCard: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
@@ -375,44 +438,75 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  
+
+  jobHeader: {
+    marginBottom: SPACING.sm,
+  },
+
   statusBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs / 2,
     borderRadius: RADIUS.sm,
-    marginBottom: SPACING.sm,
   },
-  
+
   statusText: {
     fontSize: FONT_SIZES.xs,
-    color: COLORS.white,
+    color: COLORS.text.primary,
     fontWeight: '600',
   },
-  
+
   jobTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '600',
     color: COLORS.text.primary,
     marginBottom: SPACING.xs,
   },
-  
+
   categoryContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   },
-  
+
   categoryIcon: {
     fontSize: FONT_SIZES.base,
     marginRight: SPACING.xs,
   },
-  
+
   categoryName: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
   },
-  
+
+  clientInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    backgroundColor: COLORS.gray[50],
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+  },
+
+  clientLabel: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
+    marginRight: SPACING.xs,
+  },
+
+  clientName: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+    marginRight: SPACING.xs,
+  },
+
+  clientRating: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.text.secondary,
+  },
+
   infoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -421,32 +515,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray[100],
   },
-  
+
   infoItem: {
     flexDirection: 'row',
   },
-  
+
   infoLabel: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
     marginRight: SPACING.xs,
   },
-  
+
   infoValue: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.primary,
     fontWeight: '600',
   },
-  
+
+  locationText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING.sm,
+  },
+
   dateContainer: {
     marginBottom: SPACING.sm,
   },
-  
+
   dateText: {
     fontSize: FONT_SIZES.xs,
     color: COLORS.text.secondary,
   },
-  
+
   actionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -454,81 +554,90 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.sm,
     borderTopWidth: 1,
     borderTopColor: COLORS.gray[100],
+    gap: SPACING.xs,
   },
-  
+
   actionButton: {
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.sm,
     backgroundColor: COLORS.gray[100],
-    marginRight: SPACING.xs,
-    marginBottom: SPACING.xs,
   },
-  
+
   actionButtonText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.primary,
   },
-  
+
   deleteButton: {
     backgroundColor: `${COLORS.error}20`,
   },
-  
+
   deleteButtonText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.error,
   },
-  
+
   completeButton: {
     backgroundColor: `${COLORS.success}20`,
   },
-  
+
   completeButtonText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.success,
   },
-  
+
   cancelButton: {
     backgroundColor: `${COLORS.warning}20`,
   },
-  
+
   cancelButtonText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.warning,
   },
-  
+
+  startButton: {
+    backgroundColor: `${COLORS.primary}20`,
+  },
+
+  startButtonText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: SPACING.xl * 3,
   },
-  
+
   emptyIcon: {
     fontSize: 60,
     marginBottom: SPACING.md,
   },
-  
+
   emptyTitle: {
     fontSize: FONT_SIZES.lg,
     color: COLORS.text.primary,
     textAlign: 'center',
     marginBottom: SPACING.lg,
   },
-  
+
   createButton: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.lg,
   },
-  
+
   createButtonText: {
     fontSize: FONT_SIZES.base,
     color: COLORS.white,
     fontWeight: '600',
   },
-  
+
   fab: {
     position: 'absolute',
     right: SPACING.lg,
@@ -545,7 +654,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 8,
   },
-  
+
   fabText: {
     fontSize: FONT_SIZES['2xl'],
     color: COLORS.white,

@@ -136,6 +136,26 @@ class JobController {
   }
 
   // ============================
+  // OBTENER TRABAJOS ASIGNADOS AL TRABAJADOR
+  // ============================
+  static async getWorkerJobs(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const { status } = req.query;
+
+      const jobs = await JobModel.getByWorkerId(userId, status);
+
+      res.json({
+        success: true,
+        data: jobs
+      });
+    } catch (error) {
+      logger.error('Error obteniendo trabajos del trabajador:', error);
+      next(error);
+    }
+  }
+
+  // ============================
   // ACTUALIZAR TRABAJO
   // ============================
   static async update(req, res, next) {

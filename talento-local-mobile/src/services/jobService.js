@@ -11,7 +11,7 @@ class JobService {
   async fetchAPI(endpoint, options = {}) {
     try {
       const url = `${this.baseURL}${endpoint}`;
-      
+
       // Agregar token si existe
       const token = await AsyncStorage.getItem('accessToken');
       if (token) {
@@ -20,22 +20,22 @@ class JobService {
           'Authorization': `Bearer ${token}`
         };
       }
-      
+
       // Headers por defecto
       options.headers = {
         'Content-Type': 'application/json',
         ...options.headers
       };
-      
+
       console.log('Fetching:', url);
       console.log('Options:', options);
-      
+
       const response = await fetch(url, options);
       const data = await response.json();
 
       console.log('Response status:', response.status);
       console.log('Response data:', data);
-      
+
       if (!response.ok) {
         // Mostrar errores de validación específicos
         if (data.errors) {
@@ -43,7 +43,7 @@ class JobService {
         }
         throw new Error(data.message || 'Error en la petición');
       }
-      
+
       return data;
     } catch (error) {
       console.error('Error en fetchAPI:', error);
@@ -54,7 +54,7 @@ class JobService {
   // ============================
   // CATEGORÍAS
   // ============================
-  
+
   async getCategories() {
     try {
       const response = await this.fetchAPI('/jobs/categories');
@@ -68,24 +68,24 @@ class JobService {
   // ============================
   // TRABAJOS
   // ============================
-  
+
   // Obtener lista de trabajos con filtros
   async getJobs(filters = {}) {
     try {
       const queryParams = new URLSearchParams();
-      
+
       // Agregar filtros si existen
       Object.keys(filters).forEach(key => {
         if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
           queryParams.append(key, filters[key]);
         }
       });
-      
+
       const queryString = queryParams.toString();
       const endpoint = `/jobs${queryString ? `?${queryString}` : ''}`;
-      
+
       const response = await this.fetchAPI(endpoint);
-      
+
       return {
         jobs: response.data || [],
         pagination: response.pagination || {
@@ -123,12 +123,12 @@ class JobService {
   // Crear nuevo trabajo
   async createJob(jobData) {
     try {
-      
+
       const response = await this.fetchAPI('/jobs', {
         method: 'POST',
         body: JSON.stringify(jobData)
       });
-      
+
       return response;
     } catch (error) {
       console.error('Error creando trabajo:', error);
@@ -139,10 +139,10 @@ class JobService {
   // Obtener mis trabajos publicados
   async getMyJobs(status = null) {
     try {
-      const endpoint = status 
+      const endpoint = status
         ? `/jobs/my/all?status=${status}`
         : '/jobs/my/all';
-      
+
       const response = await this.fetchAPI(endpoint);
       return response.data || [];
     } catch (error) {
@@ -158,7 +158,7 @@ class JobService {
         method: 'PUT',
         body: JSON.stringify(updateData)
       });
-      
+
       return response;
     } catch (error) {
       console.error('Error actualizando trabajo:', error);
@@ -173,7 +173,7 @@ class JobService {
         method: 'PATCH',
         body: JSON.stringify({ status })
       });
-      
+
       return response;
     } catch (error) {
       console.error('Error cambiando estado:', error);
@@ -187,7 +187,7 @@ class JobService {
       const response = await this.fetchAPI(`/jobs/${jobId}`, {
         method: 'DELETE'
       });
-      
+
       return response;
     } catch (error) {
       console.error('Error eliminando trabajo:', error);
@@ -198,7 +198,7 @@ class JobService {
   // ============================
   // APLICACIONES (para el futuro)
   // ============================
-  
+
   // Aplicar a un trabajo
   async applyToJob(jobId, applicationData) {
     try {
@@ -206,10 +206,25 @@ class JobService {
         method: 'POST',
         body: JSON.stringify(applicationData)
       });
-      
+
       return response;
     } catch (error) {
       console.error('Error aplicando al trabajo:', error);
+      throw error;
+    }
+  }
+
+  // Obtener trabajos asignados a mí como trabajador
+  async getMyAssignedJobs(status = null) {
+    try {
+      const endpoint = status
+        ? `/jobs/my/assigned?status=${status}`
+        : '/jobs/my/assigned';
+
+      const response = await this.fetchAPI(endpoint);
+      return response.data;
+    } catch (error) {
+      console.error('Error obteniendo mis trabajos asignados:', error);
       throw error;
     }
   }

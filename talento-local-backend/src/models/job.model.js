@@ -521,6 +521,50 @@ class JobModel {
       throw error;
     }
   }
+
+  // ============================
+  // OBTENER TRABAJOS DE UN TRABAJADOR
+  // ============================
+  static async getByWorkerId(workerId, status = null) {
+    try {
+      let whereConditions = ['j.assigned_worker_id = $1'];
+      let values = [workerId];
+
+      if (status) {
+        whereConditions.push('j.status = $2');
+        values.push(status);
+      }
+
+      const selectQuery = `
+      SELECT 
+        j.*,
+        c.name as category_name,
+        c.icon as category_icon,
+        u.email as client_email,
+        p.first_name as client_first_name,
+        p.last_name as client_last_name,
+        p.profile_picture_url as client_picture,
+        p.rating_average as client_rating,
+        (
+          SELECT COUNT(*) 
+          FROM job_applications 
+          WHERE job_id = j.id
+        ) as applications_count
+      FROM jobs j
+      LEFT JOIN categories c ON j.category_id = c.id
+      LEFT JOIN users u ON j.client_id = u.id
+      LEFT JOIN profiles p ON u.id = p.user_id
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY j.created_at DESC
+    `;
+
+      const result = await query(selectQuery, values);
+      return result.rows;
+    } catch (error) {
+      logger.error('Error obteniendo trabajos del trabajador:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = JobModel;

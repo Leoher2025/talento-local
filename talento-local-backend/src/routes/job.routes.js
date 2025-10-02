@@ -56,6 +56,14 @@ router.put(
   JobController.update
 );
 
+// GET /api/jobs/my/assigned - Obtener trabajos asignados a mí (TRABAJADORES)
+router.get(
+  '/my/assigned',
+  authenticate,
+  authorize('worker'),
+  JobController.getWorkerJobs
+);
+
 // PATCH /api/jobs/:id/status - Cambiar estado del trabajo
 router.patch(
   '/:jobId/status',

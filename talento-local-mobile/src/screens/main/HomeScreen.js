@@ -1,5 +1,5 @@
 // src/screens/main/HomeScreen.js - Pantalla principal de la app
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES, JOB_CATEGORIES } from '../../utils/constants';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import applicationService from '../../services/applicationService';
+import jobService from '../../services/jobService';
 
 export default function HomeScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -66,48 +68,176 @@ export default function HomeScreen({ navigation }) {
 }
 
 // Vista para Trabajadores
+// Vista para Trabajadores
 const WorkerHomeView = ({ navigation }) => {
+  const { user } = useAuth();
+  const [stats, setStats] = useState({
+    activeJobs: 0,
+    completedJobs: 0,
+    rating: 0,
+    pendingApplications: 0
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  useEffect(() => {
+    loadWorkerStats();
+  }, []);
+
+  const loadWorkerStats = async () => {
+    try {
+      setIsLoadingStats(true);
+
+      // Cargar estadísticas de aplicaciones
+      const appStats = await applicationService.getStats();
+
+      // Cargar trabajos asignados
+      const assignedJobs = await jobService.getMyAssignedJobs();
+
+      // Calcular estadísticas
+      const activeJobs = assignedJobs?.filter(j =>
+        ['active', 'in_progress'].includes(j.status)
+      ).length || 0;
+
+      const completedJobs = assignedJobs?.filter(j =>
+        j.status === 'completed'
+      ).length || 0;
+
+      setStats({
+        activeJobs,
+        completedJobs,
+        rating: user?.profile?.rating_average || 0,
+        pendingApplications: appStats.data?.pending_applications || 0,
+        totalApplications: appStats.data?.total_applications || 0
+      });
+    } catch (error) {
+      console.error('Error cargando estadísticas:', error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
   return (
     <View style={styles.content}>
       {/* Estadísticas rápidas */}
       <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>0</Text>
+        <TouchableOpacity
+          style={styles.statCard}
+          onPress={() => navigation.navigate('MyJobs')}
+        >
+          <Text style={styles.statNumber}>{stats.activeJobs}</Text>
           <Text style={styles.statLabel}>Trabajos Activos</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>0</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.statCard}
+          onPress={() => navigation.navigate('MyJobs')}
+        >
+          <Text style={styles.statNumber}>{stats.completedJobs}</Text>
           <Text style={styles.statLabel}>Completados</Text>
-        </View>
+        </TouchableOpacity>
+
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>0.0</Text>
-          <Text style={styles.statLabel}>Calificación</Text>
+          <Text style={styles.statNumber}>
+            {parseFloat(stats.rating || 0).toFixed(1)}
+          </Text>
+          <Text style={styles.statLabel}>⭐ Calificación</Text>
         </View>
       </View>
 
-      {/* Sección de trabajos disponibles */}
+      {/* Tarjeta de aplicaciones */}
+      <TouchableOpacity
+        style={styles.applicationsCard}
+        onPress={() => navigation.navigate('MyApplications')}
+      >
+        <View style={styles.applicationCardHeader}>
+          <View>
+            <Text style={styles.applicationsTitle}>Mis Aplicaciones</Text>
+            <Text style={styles.applicationsSubtitle}>
+              {stats.totalApplications} aplicaciones totales
+            </Text>
+          </View>
+          <View style={styles.pendingBadge}>
+            <Text style={styles.pendingCount}>{stats.pendingApplications}</Text>
+            <Text style={styles.pendingLabel}>Pendientes</Text>
+          </View>
+        </View>
+        <Text style={styles.viewAllLink}>Ver todas →</Text>
+      </TouchableOpacity>
+
+      {/* Acciones rápidas */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
+
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: COLORS.primary + '10' }]}
+          onPress={() => navigation.navigate('JobsList')}
+        >
+          <Text style={styles.actionIcon}>🔍</Text>
+          <View style={styles.actionInfo}>
+            <Text style={styles.actionTitle}>Buscar Trabajos</Text>
+            <Text style={styles.actionSubtitle}>
+              Encuentra trabajos cerca de ti
+            </Text>
+          </View>
+          <Text style={styles.actionArrow}>→</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: COLORS.success + '10' }]}
+          onPress={() => navigation.navigate('MyJobs')}
+        >
+          <Text style={styles.actionIcon}>📋</Text>
+          <View style={styles.actionInfo}>
+            <Text style={styles.actionTitle}>Mis Trabajos</Text>
+            <Text style={styles.actionSubtitle}>
+              Ver trabajos asignados
+            </Text>
+          </View>
+          <Text style={styles.actionArrow}>→</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: COLORS.warning + '10' }]}
+          onPress={() => navigation.navigate('MyApplications')}
+        >
+          <Text style={styles.actionIcon}>📝</Text>
+          <View style={styles.actionInfo}>
+            <Text style={styles.actionTitle}>Mis Aplicaciones</Text>
+            <Text style={styles.actionSubtitle}>
+              {stats.pendingApplications} pendientes de respuesta
+            </Text>
+          </View>
+          <Text style={styles.actionArrow}>→</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: COLORS.info + '10' }]}
+          onPress={() => navigation.navigate('ConversationsScreen')}
+        >
+          <Text style={styles.actionIcon}>💬</Text>
+          <View style={styles.actionInfo}>
+            <Text style={styles.actionTitle}>Mensajes</Text>
+            <Text style={styles.actionSubtitle}>
+              Conversaciones con clientes
+            </Text>
+          </View>
+          <Text style={styles.actionArrow}>→</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Trabajos recomendados */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Trabajos Disponibles</Text>
+          <Text style={styles.sectionTitle}>Trabajos Cercanos</Text>
           <TouchableOpacity
             onPress={() => navigation.navigate('JobsList')}
           >
             <Text style={styles.sectionLink}>Ver todos →</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📋</Text>
-          <Text style={styles.emptyText}>
-            No hay trabajos disponibles en tu área
-          </Text>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('JobsList')}
-          >
-            <Text style={styles.actionButtonText}>Explorar Trabajos</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.comingSoon}>
+          Pronto verás trabajos recomendados aquí
+        </Text>
       </View>
     </View>
   );
@@ -478,5 +608,106 @@ const styles = StyleSheet.create({
   chatIcon: {
     fontSize: 24,
     color: COLORS.white,
-  }
+  },
+
+  applicationsCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  applicationCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+
+  applicationsTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+    marginBottom: SPACING.xs / 2,
+  },
+
+  applicationsSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
+  },
+
+  pendingBadge: {
+    backgroundColor: COLORS.warning + '20',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+  },
+
+  pendingCount: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: 'bold',
+    color: COLORS.warning,
+  },
+
+  pendingLabel: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.warning,
+    marginTop: 2,
+  },
+
+  viewAllLink: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+
+  actionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+  },
+
+  actionIcon: {
+    fontSize: 32,
+    marginRight: SPACING.md,
+  },
+
+  actionInfo: {
+    flex: 1,
+  },
+
+  actionTitle: {
+    fontSize: FONT_SIZES.base,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+    marginBottom: 2,
+  },
+
+  actionSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
+  },
+
+  actionArrow: {
+    fontSize: FONT_SIZES.xl,
+    color: COLORS.text.secondary,
+  },
+
+  comingSoon: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: SPACING.lg,
+  },
 });

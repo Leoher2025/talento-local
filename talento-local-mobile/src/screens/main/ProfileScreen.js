@@ -14,6 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES, API_URL, STATIC_URL } from '../../utils/constants';
 import StarRating from '../../components/StarRating';
 import reviewService from '../../services/reviewService';
+import notificationService from '../../services/notificationService'; //Quitar despues ya que solo es de prueba
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -33,6 +34,24 @@ export default function ProfileScreen({ navigation }) {
       }
     } catch (error) {
       console.error('Error cargando estadísticas:', error);
+    }
+  };
+
+  // Quitar despues solo es de prueba
+  const handleTestNotification = async () => {
+    try {
+      await notificationService.sendTestNotification();
+      Toast.show({
+        type: 'success',
+        text1: 'Notificación enviada',
+        text2: 'Revisa tu bandeja de notificaciones',
+      });
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudo enviar la notificación',
+      });
     }
   };
 
@@ -266,6 +285,16 @@ export default function ProfileScreen({ navigation }) {
             <Text style={styles.menuText}>Acerca de</Text>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
+
+          // En el render, agrega este botón (solo en desarrollo):
+          {__DEV__ && (
+            <TouchableOpacity
+              style={styles.testButton}
+              onPress={handleTestNotification}
+            >
+              <Text style={styles.testButtonText}>🔔 Probar Notificación</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Botón de Cerrar Sesión */}

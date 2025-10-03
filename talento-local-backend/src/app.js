@@ -12,6 +12,7 @@ const path = require('path');
 const routes = require('./routes');
 // Importar el middleware de errores correctamente
 const { errorHandler } = require('./middlewares/error.middleware');
+const notificationRoutes = require('./routes/notification.routes');
 
 // Crear aplicación Express
 const app = express();
@@ -81,6 +82,9 @@ app.get('/health', (req, res) => {
 
 // Rutas principales de la API
 app.use('/api', routes);
+
+// Registrar rutas
+app.use('/api/notifications', notificationRoutes);
 
 // ============================
 // MANEJO DE ERRORES

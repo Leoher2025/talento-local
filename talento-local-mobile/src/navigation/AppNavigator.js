@@ -39,6 +39,9 @@ import ChatScreen from '../screens/main/ChatScreen';
 import CreateReviewScreen from '../screens/reviews/CreateReviewScreen';
 import UserReviewsScreen from '../screens/reviews/UserReviewsScreen';
 
+// Pantallas de Notificaciones
+import NotificationsScreen from '../screens/notifications/NotificationsScreen';
+
 const Stack = createNativeStackNavigator();
 
 // Stack de autenticación (usuarios no logueados)
@@ -234,6 +237,15 @@ const MainStack = () => {
         component={UserReviewsScreen}
         options={{
           title: 'Calificaciones',
+          headerShown: false
+        }}
+      />
+      {/* Pantalla de notificaciones */}
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          title: 'Notificaciones',
           headerShown: false
         }}
       />

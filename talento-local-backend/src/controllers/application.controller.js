@@ -2,12 +2,14 @@
 // Controlador para manejo de aplicaciones a trabajos
 const ApplicationModel = require('../models/application.model');
 const logger = require('../utils/logger');
-
+const NotificationHelpers = require('../utils/notificationHelpers');
+const JobModel = require('../models/job.model');
+const { query } = require('../config/database');
 class ApplicationController {
   // Crear nueva aplicación
   async create(req, res, next) {
     try {
-      const { jobId, message, proposedBudget } = req.body;
+      const { jobId, message, proposedBudget, coverLetter, proposedAmount, estimatedDuration } = req.body;
       const workerId = req.user.id;
 
       // Crear aplicación
@@ -17,6 +19,18 @@ class ApplicationController {
         message,
         proposed_budget: proposedBudget
       });
+
+      // ✅ ENVIAR NOTIFICACIÓN AL CLIENTE
+      const job = await JobModel.getById(jobId);
+      const worker = await query('SELECT first_name, last_name FROM profiles WHERE user_id = $1', [workerId]);
+      const workerName = `${worker.rows[0].first_name} ${worker.rows[0].last_name}`;
+
+      await NotificationHelpers.notifyNewApplication(
+        job.client_id,
+        workerName,
+        job.title,
+        job.id
+      );
 
       logger.info(`Nueva aplicación creada: ${application.id} por usuario ${workerId}`);
 
@@ -149,6 +163,7 @@ class ApplicationController {
 
       // Verificar que la aplicación existe
       const application = await ApplicationModel.getById(id);
+
       if (!application) {
         return res.status(404).json({
           success: false,
@@ -158,6 +173,7 @@ class ApplicationController {
 
       // Verificar que el cliente es dueño del trabajo
       const isOwner = await ApplicationModel.verifyJobOwnership(application.job_id, clientId);
+
       if (!isOwner) {
         return res.status(403).json({
           success: false,
@@ -169,6 +185,9 @@ class ApplicationController {
       await ApplicationModel.acceptApplication(id);
 
       logger.info(`Aplicación ${id} aceptada por cliente ${clientId}`);
+
+      // ✅ ENVIAR NOTIFICACIÓN
+      await NotificationHelpers.notifyApplicationAccepted(application, isOwner);
 
       res.json({
         success: true,
@@ -191,6 +210,7 @@ class ApplicationController {
 
       // Verificar que la aplicación existe
       const application = await ApplicationModel.getById(id);
+
       if (!application) {
         return res.status(404).json({
           success: false,
@@ -200,6 +220,7 @@ class ApplicationController {
 
       // Verificar que el cliente es dueño del trabajo
       const isOwner = await ApplicationModel.verifyJobOwnership(application.job_id, clientId);
+
       if (!isOwner) {
         return res.status(403).json({
           success: false,
@@ -212,6 +233,9 @@ class ApplicationController {
 
       logger.info(`Aplicación ${id} rechazada por cliente ${clientId}`);
 
+      // ✅ ENVIAR NOTIFICACIÓN
+      await NotificationHelpers.notifyApplicationRejected(application, isOwner);
+
       res.json({
         success: true,
         message: 'Aplicación rechazada',
@@ -220,6 +244,8 @@ class ApplicationController {
           status: 'rejected'
         }
       });
+
+      logger.info(`Aplicación ${id} rechazada por cliente ${clientId}`);
     } catch (error) {
       next(error);
     }

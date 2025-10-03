@@ -14,7 +14,8 @@ import applicationService from '../../services/applicationService';
 import jobService from '../../services/jobService';
 
 export default function HomeScreen({ navigation }) {
-  const { user, logout } = useAuth();
+  const { user, logout, unreadNotifications } = useAuth();
+  const isWorker = user?.role === USER_ROLES.WORKER; 
 
   // Renderizar vista según el rol del usuario
   const renderContent = () => {
@@ -27,29 +28,40 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header personalizado */}
+      <ScrollView style={styles.scrollView}>
+        {/* Header con notificaciones */}
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerLeft}>
             <Text style={styles.greeting}>
-              Hola, {user?.profile?.firstName || 'Usuario'} 👋
-            </Text>
-            <Text style={styles.subGreeting}>
-              {user?.role === USER_ROLES.WORKER
+              {isWorker
                 ? '¿Listo para trabajar hoy?'
                 : '¿Qué necesitas hoy?'}
             </Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={() => navigation.navigate('Profile')}
-          >
-            <Text style={styles.profileIcon}>👤</Text>
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            {/* Botón de notificaciones */}
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <Text style={styles.notificationIcon}>🔔</Text>
+              {unreadNotifications > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={() => navigation.navigate('Profile')}
+            >
+              <Text style={styles.profileIcon}>👤</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Contenido según el rol */}
@@ -354,8 +366,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    padding: SPACING.lg,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray[200],
@@ -374,12 +385,7 @@ const styles = StyleSheet.create({
   },
 
   profileButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.gray[100],
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: SPACING.sm,
   },
 
   profileIcon: {
@@ -709,5 +715,43 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     paddingVertical: SPACING.lg,
+  },
+
+  headerLeft: {
+    flex: 1,
+  },
+
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+
+  notificationButton: {
+    position: 'relative',
+    padding: SPACING.sm,
+  },
+
+  notificationIcon: {
+    fontSize: FONT_SIZES.xl,
+  },
+
+  badge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: COLORS.error,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+
+  badgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });

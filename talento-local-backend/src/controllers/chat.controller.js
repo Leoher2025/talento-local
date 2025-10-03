@@ -1,6 +1,8 @@
 // src/controllers/chat.controller.js
 const ChatModel = require('../models/chat.model');
 const logger = require('../utils/logger');
+const NotificationHelpers = require('../utils/notificationHelpers');
+const { query } = require('../config/database');
 
 class ChatController {
   // ============================
@@ -134,8 +136,6 @@ class ChatController {
       const { message, messageType = 'text' } = req.body;
       const userId = req.user.id;
 
-      console.log('Datos recibidos:', { message, messageType }); // Debug
-
       // Verificar acceso a la conversación
       const conversation = await ChatModel.getConversationById(conversationId);
       if (!conversation || (conversation.client_id !== userId && conversation.worker_id !== userId)) {
@@ -151,6 +151,29 @@ class ChatController {
           success: false,
           message: 'No se pueden enviar mensajes a conversaciones archivadas'
         });
+      }
+
+      const recipientId = conversation.client_id === userId
+        ? conversation.worker_id
+        : conversation.client_id;
+
+      // Obtener nombre del remitente
+      const sender = await query(
+        'SELECT first_name, last_name FROM profiles WHERE user_id = $1',
+        [userId]
+      );
+      const senderName = `${sender.rows[0].first_name} ${sender.rows[0].last_name}`;
+
+      await NotificationHelpers.notifyNewMessage(
+        recipientId,
+        senderName,
+        message,
+        conversationId
+      );
+
+      // Emitir a Socket.IO si está disponible
+      if (global.io) {
+        global.io.to(conversationId).emit('new_message', newMessage);
       }
 
       const newMessage = await ChatModel.sendMessage({

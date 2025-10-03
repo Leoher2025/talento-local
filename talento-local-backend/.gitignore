@@ -51,3 +51,6 @@ docs/
 .temp/
 *.bak
 *.tmp
+
+# Firebase
+firebase-service-account.json

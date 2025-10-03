@@ -1,8 +1,9 @@
 // src/context/AuthContext.js - Manejo global del estado de autenticación
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import authService from '../services/authService';
+import notificationService from '../services/notificationService';
 
 // Crear el contexto
 const AuthContext = createContext({});
@@ -21,11 +22,75 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   // Verificar si hay una sesión guardada al iniciar la app
   useEffect(() => {
     checkAuthState();
   }, []);
+
+  // Función para actualizar contador de notificaciones
+  const updateUnreadCount = async () => {
+    try {
+      const count = await notificationService.getUnreadCount();
+      setUnreadNotifications(count);
+    } catch (error) {
+      console.error('Error actualizando contador:', error);
+    }
+  };
+
+  // Configurar listeners de notificaciones
+  useEffect(() => {
+    let unsubscribe;
+
+    if (user) {
+      // Configurar listeners
+      unsubscribe = notificationService.setupNotificationListeners(
+        // Callback cuando llega notificación
+        (notification) => {
+          console.log('Nueva notificación:', notification);
+          updateUnreadCount();
+        },
+        // Callback cuando se abre notificación
+        (notification) => {
+          console.log('Notificación abierta:', notification);
+          handleNotificationNavigation(notification);
+        }
+      );
+
+      // Actualizar contador al iniciar
+      updateUnreadCount();
+    }
+
+    // Cleanup al desmontar o cuando cambia user
+    return () => {
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [user]);
+
+  // Manejar navegación desde notificación
+  const handleNotificationNavigation = (notification) => {
+    const data = notification.request?.content?.data || notification.data;
+
+    if (!data) return;
+
+    // Navegar según el tipo de notificación
+    switch (data.screen) {
+      case 'ChatScreen':
+        // navigation.navigate('ChatScreen', { conversationId: data.conversationId });
+        break;
+      case 'JobDetail':
+        // navigation.navigate('JobDetail', { jobId: data.jobId });
+        break;
+      case 'ManageApplications':
+        // navigation.navigate('ManageApplications', { jobId: data.jobId });
+        break;
+      default:
+        break;
+    }
+  };
 
   // Verificar estado de autenticación
   const checkAuthState = async () => {
@@ -78,6 +143,7 @@ export const AuthProvider = ({ children }) => {
         // Guardar tokens y datos del usuario
         await AsyncStorage.setItem('accessToken', response.data.tokens.accessToken);
         await AsyncStorage.setItem('refreshToken', response.data.tokens.refreshToken);
+        await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
 
         // Reestructurar los datos del usuario para un acceso más fácil
         const userData = {
@@ -99,6 +165,9 @@ export const AuthProvider = ({ children }) => {
 
         // Guardar en almacenamiento local
         await AsyncStorage.setItem('userData', JSON.stringify(userData));
+
+        // Registrar token de notificaciones
+        await notificationService.registerToken();
 
         Toast.show({
           type: 'success',
@@ -139,6 +208,7 @@ export const AuthProvider = ({ children }) => {
         // Guardar tokens y datos del usuario
         await AsyncStorage.setItem('accessToken', response.data.tokens.accessToken);
         await AsyncStorage.setItem('refreshToken', response.data.tokens.refreshToken);
+        await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
 
         // Reestructurar los datos del usuario similar al login
         const userDataFormatted = {
@@ -163,6 +233,9 @@ export const AuthProvider = ({ children }) => {
           text1: '¡Cuenta creada!',
           text2: 'Tu registro ha sido exitoso'
         });
+
+        // Registrar token de notificaciones
+        await notificationService.registerToken();
 
         return { success: true };
       } else {
@@ -194,6 +267,9 @@ export const AuthProvider = ({ children }) => {
       if (refreshToken) {
         await authService.logout(refreshToken);
       }
+
+      // Eliminar token de notificaciones
+      await notificationService.removeToken();
 
       // Limpiar almacenamiento local
       await AsyncStorage.removeItem('accessToken');
@@ -280,7 +356,9 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateUser,
     refreshUserData,
-    checkAuthState
+    checkAuthState,
+    unreadNotifications,
+    updateUnreadCount,
   };
 
   return (

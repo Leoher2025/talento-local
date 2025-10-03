@@ -3,7 +3,9 @@
 
 const ReviewModel = require('../models/review.model');
 const logger = require('../utils/logger');
-
+const NotificationHelpers = require('../utils/notificationHelpers');
+const JobModel = require('../models/job.model');
+const { query } = require('../config/database');
 class ReviewController {
   // ============================
   // CREAR REVIEW
@@ -54,6 +56,21 @@ class ReviewController {
       };
 
       const review = await ReviewModel.create(reviewData);
+
+      // ✅ ENVIAR NOTIFICACIÓN AL REVIEWEE
+      const job = await JobModel.getById(req.body.jobId);
+      const reviewer = await query(
+        'SELECT first_name, last_name FROM profiles WHERE user_id = $1',
+        [reviewerId]
+      );
+      const reviewerName = `${reviewer.rows[0].first_name} ${reviewer.rows[0].last_name}`;
+
+      await NotificationHelpers.notifyNewReview(
+        req.body.revieweeId,
+        reviewerName,
+        req.body.rating,
+        job.title
+      );
 
       res.status(201).json({
         success: true,

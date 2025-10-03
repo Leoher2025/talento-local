@@ -1,6 +1,7 @@
 // - Controlador para manejo de trabajos
 const JobModel = require('../models/job.model');
 const logger = require('../utils/logger');
+const NotificationHelpers = require('../utils/notificationHelpers');
 
 class JobController {
   // ============================
@@ -287,6 +288,23 @@ class JobController {
 
       // Actualizar el estado
       const updatedJob = await JobModel.updateStatus(jobId, status, userId);
+
+      // ✅ ENVIAR NOTIFICACIONES
+      if (status === 'in_progress' && job.client_id) {
+        // Notificar al cliente que el trabajo ha iniciado
+        await NotificationHelpers.notifyJobStatusChange(job.client_id, job, status);
+      } else if (status === 'completed') {
+        // Notificar al trabajador que el cliente ha completado
+        if (job.assigned_worker_id) {
+          await NotificationHelpers.notifyJobStatusChange(job.assigned_worker_id, job, status);
+        }
+      } else if (status === 'cancelled') {
+        // Notificar a la otra parte
+        const notifyUserId = userId === job.client_id ? job.assigned_worker_id : job.client_id;
+        if (notifyUserId) {
+          await NotificationHelpers.notifyJobStatusChange(notifyUserId, job, status);
+        }
+      }
 
       res.json({
         success: true,

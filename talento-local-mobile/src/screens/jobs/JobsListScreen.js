@@ -1,5 +1,7 @@
-// src/screens/jobs/JobsListScreen.js - Pantalla para ver lista de trabajos disponibles
-import React, { useState, useEffect } from 'react';
+// src/screens/jobs/JobsListScreen.js
+// Pantalla de búsqueda y lista de trabajos con filtros avanzados
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,262 +11,274 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
 } from 'react-native';
-import { useAuth } from '../../context/AuthContext';
-import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES } from '../../utils/constants';
+import { useFocusEffect } from '@react-navigation/native';
+import { COLORS, FONT_SIZES, SPACING, RADIUS } from '../../utils/constants';
 import jobService from '../../services/jobService';
+import JobFilters from '../../components/JobFilters';
+import Toast from 'react-native-toast-message';
 
 export default function JobsListScreen({ navigation }) {
-  const { user } = useAuth();
   const [jobs, setJobs] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({});
   const [pagination, setPagination] = useState({
     page: 1,
     totalPages: 1,
     total: 0
   });
+  const [activeFiltersCount, setActiveFiltersCount] = useState(0);
 
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  useEffect(() => {
-    loadJobs();
-  }, [selectedCategory]);
-
-  const loadInitialData = async () => {
-    setIsLoading(true);
-    await Promise.all([
-      loadCategories(),
-      loadJobs()
-    ]);
-    setIsLoading(false);
-  };
-
-  const loadCategories = async () => {
-    try {
-      const cats = await jobService.getCategories();
-      setCategories(cats);
-    } catch (error) {
-      console.error('Error cargando categorías:', error);
-    }
-  };
+  useFocusEffect(
+    useCallback(() => {
+      loadJobs(1, true);
+    }, [filters, searchText])
+  );
 
   const loadJobs = async (page = 1, refresh = false) => {
     try {
-      if (refresh) setIsRefreshing(true);
-      
-      const filters = {
+      if (refresh) {
+        setIsRefreshing(true);
+        setIsLoading(page === 1);
+      } else {
+        setIsLoadingMore(true);
+      }
+
+      const searchFilters = {
+        ...filters,
+        search: searchText.trim(),
         page,
-        limit: 20,
-        sortBy: 'created_at',
-        sortOrder: 'DESC'
+        limit: 20
       };
 
-      if (selectedCategory) {
-        filters.categoryId = selectedCategory;
+      const result = await jobService.getJobs(searchFilters);
+
+      if (page === 1) {
+        setJobs(result.jobs);
+      } else {
+        setJobs(prev => [...prev, ...result.jobs]);
       }
 
-      const response = await jobService.getJobs(filters);
-      
-      if (page === 1) {
-        setJobs(response.jobs);
-      } else {
-        setJobs(prev => [...prev, ...response.jobs]);
-      }
-      
-      setPagination(response.pagination);
+      setPagination(result.pagination);
     } catch (error) {
       console.error('Error cargando trabajos:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudieron cargar los trabajos',
+      });
     } finally {
+      setIsLoading(false);
       setIsRefreshing(false);
+      setIsLoadingMore(false);
     }
   };
 
   const handleRefresh = () => {
+    setPagination({ ...pagination, page: 1 });
     loadJobs(1, true);
   };
 
   const handleLoadMore = () => {
-    if (pagination.page < pagination.totalPages && !isLoading) {
+    if (!isLoadingMore && pagination.page < pagination.totalPages) {
       loadJobs(pagination.page + 1);
     }
   };
 
-  const handleCategoryPress = (categoryId) => {
-    if (selectedCategory === categoryId) {
-      setSelectedCategory(null);
-    } else {
-      setSelectedCategory(categoryId);
-    }
+  const handleApplyFilters = (newFilters) => {
+    setFilters(newFilters);
+    setShowFilters(false);
+    setPagination({ ...pagination, page: 1 });
+    
+    // Contar filtros activos
+    const count = Object.keys(newFilters).filter(key => 
+      newFilters[key] && !['sortBy', 'sortOrder', 'page', 'limit'].includes(key)
+    ).length;
+    setActiveFiltersCount(count);
   };
 
-  const getUrgencyColor = (urgency) => {
-    switch (urgency) {
-      case 'urgent': return COLORS.error;
-      case 'high': return COLORS.warning;
-      case 'medium': return COLORS.info;
-      default: return COLORS.success;
-    }
+  const handleClearFilters = () => {
+    setFilters({});
+    setSearchText('');
+    setActiveFiltersCount(0);
   };
 
-  const getUrgencyText = (urgency) => {
-    switch (urgency) {
-      case 'urgent': return '🔥 Urgente';
-      case 'high': return '⚡ Alta';
-      case 'medium': return '⏱️ Media';
-      default: return '😌 Baja';
-    }
+  const handleSearch = () => {
+    setPagination({ ...pagination, page: 1 });
+    loadJobs(1, true);
   };
 
-  const renderCategoryFilter = () => (
-    <View style={styles.categoriesContainer}>
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={categories}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.categoryChip,
-              selectedCategory === item.id && styles.categoryChipActive
-            ]}
-            onPress={() => handleCategoryPress(item.id)}
-          >
-            <Text style={styles.categoryIcon}>{item.icon}</Text>
-            <Text style={[
-              styles.categoryName,
-              selectedCategory === item.id && styles.categoryNameActive
-            ]}>
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
-    </View>
-  );
+  const renderJobCard = ({ item }) => {
+    const distance = item.distance_km ? `${parseFloat(item.distance_km).toFixed(1)} km` : null;
 
-  const renderJobCard = ({ item }) => (
-    <TouchableOpacity
-      style={styles.jobCard}
-      onPress={() => navigation.navigate('JobDetail', { jobId: item.id })}
-      activeOpacity={0.7}
-    >
-      {/* Header del trabajo */}
-      <View style={styles.jobHeader}>
-        <View style={styles.jobTitleContainer}>
-          <Text style={styles.jobTitle} numberOfLines={2}>
-            {item.title}
-          </Text>
-          <View style={[styles.urgencyBadge, { backgroundColor: getUrgencyColor(item.urgency) }]}>
-            <Text style={styles.urgencyText}>{getUrgencyText(item.urgency)}</Text>
+    return (
+      <TouchableOpacity
+        style={styles.jobCard}
+        onPress={() => navigation.navigate('JobDetail', { jobId: item.id })}
+        activeOpacity={0.7}
+      >
+        {/* Header con categoría y distancia */}
+        <View style={styles.cardHeader}>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryIcon}>{item.category_icon}</Text>
+            <Text style={styles.categoryName}>{item.category_name}</Text>
           </View>
+          {distance && (
+            <View style={styles.distanceBadge}>
+              <Text style={styles.distanceText}>📍 {distance}</Text>
+            </View>
+          )}
         </View>
-      </View>
 
-      {/* Categoría */}
-      <View style={styles.jobCategory}>
-        <Text style={styles.categoryIcon}>{item.category_icon}</Text>
-        <Text style={styles.jobCategoryText}>{item.category_name}</Text>
-      </View>
+        {/* Título */}
+        <Text style={styles.jobTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
 
-      {/* Descripción */}
-      <Text style={styles.jobDescription} numberOfLines={2}>
-        {item.description}
-      </Text>
+        {/* Descripción */}
+        <Text style={styles.jobDescription} numberOfLines={2}>
+          {item.description}
+        </Text>
 
-      {/* Información adicional */}
-      <View style={styles.jobInfo}>
-        <View style={styles.infoItem}>
-          <Text style={styles.infoIcon}>📍</Text>
-          <Text style={styles.infoText}>{item.city}, {item.department}</Text>
+        {/* Información */}
+        <View style={styles.jobInfo}>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoIcon}>💰</Text>
+            <Text style={styles.infoText}>
+              {item.budget_type === 'fixed'
+                ? `Q${parseFloat(item.budget_amount || 0).toFixed(2)}`
+                : item.budget_type === 'hourly'
+                  ? `Q${parseFloat(item.budget_amount || 0).toFixed(2)}/h`
+                  : 'Negociable'}
+            </Text>
+          </View>
+
+          <View style={styles.infoItem}>
+            <Text style={styles.infoIcon}>📍</Text>
+            <Text style={styles.infoText}>{item.city}</Text>
+          </View>
+
+          {item.urgency && (
+            <View style={[styles.urgencyBadge, getUrgencyStyle(item.urgency)]}>
+              <Text style={styles.urgencyText}>
+                {getUrgencyIcon(item.urgency)} {getUrgencyLabel(item.urgency)}
+              </Text>
+            </View>
+          )}
         </View>
-        
-        <View style={styles.infoItem}>
-          <Text style={styles.infoIcon}>💰</Text>
-          <Text style={styles.infoText}>
-            {item.budget_type === 'fixed' 
-              ? `Q${item.budget_amount || '0'}`
-              : item.budget_type === 'hourly'
-              ? `Q${item.budget_amount || '0'}/hora`
-              : 'Negociable'}
+
+        {/* Footer */}
+        <View style={styles.cardFooter}>
+          <Text style={styles.timeAgo}>
+            {getTimeAgo(item.created_at)}
           </Text>
-        </View>
-      </View>
-
-      {/* Footer */}
-      <View style={styles.jobFooter}>
-        <View style={styles.clientInfo}>
-          <Text style={styles.clientName}>
-            {item.client_first_name} {item.client_last_name}
-          </Text>
-          {item.client_rating > 0 && (
-            <Text style={styles.clientRating}>
-              ⭐ {item.client_rating.toFixed(1)}
+          {item.applications_count > 0 && (
+            <Text style={styles.applicationsCount}>
+              {item.applications_count} {item.applications_count === 1 ? 'aplicación' : 'aplicaciones'}
             </Text>
           )}
         </View>
-        
-        <Text style={styles.jobDate}>
-          {new Date(item.created_at).toLocaleDateString()}
-        </Text>
-      </View>
-
-      {/* Contador de aplicaciones (para trabajadores) */}
-      {user?.role === USER_ROLES.WORKER && (
-        <View style={styles.applicationsCount}>
-          <Text style={styles.applicationsText}>
-            👥 {item.applications_count || 0} aplicaciones
-          </Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyIcon}>📭</Text>
-      <Text style={styles.emptyTitle}>No hay trabajos disponibles</Text>
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyIcon}>🔍</Text>
+      <Text style={styles.emptyTitle}>Sin resultados</Text>
       <Text style={styles.emptyText}>
-        {selectedCategory 
-          ? 'No hay trabajos en esta categoría'
-          : 'Sé el primero en publicar un trabajo'}
+        {searchText || activeFiltersCount > 0
+          ? 'No encontramos trabajos con estos criterios'
+          : 'No hay trabajos disponibles en este momento'}
       </Text>
-      {selectedCategory && (
+      {(searchText || activeFiltersCount > 0) && (
         <TouchableOpacity
-          style={styles.clearFilterButton}
-          onPress={() => setSelectedCategory(null)}
+          style={styles.clearButton}
+          onPress={handleClearFilters}
         >
-          <Text style={styles.clearFilterText}>Limpiar filtro</Text>
+          <Text style={styles.clearButtonText}>Limpiar búsqueda</Text>
         </TouchableOpacity>
       )}
     </View>
   );
 
+  const renderFooter = () => {
+    if (!isLoadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={COLORS.primary} />
+      </View>
+    );
+  };
+
   if (isLoading && jobs.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Cargando trabajos...</Text>
+        <Text style={styles.loadingText}>Buscando trabajos...</Text>
       </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Filtros de categorías */}
-      {renderCategoryFilter()}
-      
+      {/* Header con búsqueda */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backIcon}>←</Text>
+        </TouchableOpacity>
+
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar trabajos..."
+            value={searchText}
+            onChangeText={setSearchText}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
+          />
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setShowFilters(true)}
+          >
+            <Text style={styles.filterIcon}>⚙️</Text>
+            {activeFiltersCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Contador de resultados */}
+      <View style={styles.resultsHeader}>
+        <Text style={styles.resultsCount}>
+          {pagination.total} {pagination.total === 1 ? 'trabajo encontrado' : 'trabajos encontrados'}
+        </Text>
+        {activeFiltersCount > 0 && (
+          <TouchableOpacity onPress={handleClearFilters}>
+            <Text style={styles.clearFiltersText}>Limpiar filtros</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       {/* Lista de trabajos */}
       <FlatList
         data={jobs}
-        keyExtractor={(item) => item.id}
         renderItem={renderJobCard}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        ListEmptyComponent={renderEmptyState}
+        ListFooterComponent={renderFooter}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -274,29 +288,62 @@ export default function JobsListScreen({ navigation }) {
         }
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
-        ListEmptyComponent={renderEmptyState}
-        ListFooterComponent={() => 
-          pagination.page < pagination.totalPages && (
-            <ActivityIndicator 
-              style={styles.footerLoader}
-              color={COLORS.primary}
-            />
-          )
-        }
       />
 
-      {/* Botón flotante para crear trabajo (solo clientes) */}
-      {user?.role === USER_ROLES.CLIENT && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => navigation.navigate('CreateJob')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.fabText}>+</Text>
-        </TouchableOpacity>
-      )}
+      {/* Modal de filtros */}
+      <JobFilters
+        visible={showFilters}
+        onClose={() => setShowFilters(false)}
+        onApply={handleApplyFilters}
+        initialFilters={filters}
+      />
     </SafeAreaView>
   );
+}
+
+// Funciones auxiliares
+function getUrgencyIcon(urgency) {
+  const icons = {
+    urgent: '🔥',
+    high: '⚡',
+    medium: '⏱️',
+    low: '😌'
+  };
+  return icons[urgency] || '';
+}
+
+function getUrgencyLabel(urgency) {
+  const labels = {
+    urgent: 'Urgente',
+    high: 'Alta',
+    medium: 'Media',
+    low: 'Baja'
+  };
+  return labels[urgency] || '';
+}
+
+function getUrgencyStyle(urgency) {
+  const styles = {
+    urgent: { backgroundColor: COLORS.error + '20' },
+    high: { backgroundColor: COLORS.warning + '20' },
+    medium: { backgroundColor: COLORS.info + '20' },
+    low: { backgroundColor: COLORS.success + '20' }
+  };
+  return styles[urgency] || {};
+}
+
+function getTimeAgo(dateString) {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 60) return `Hace ${diffMins}m`;
+  if (diffHours < 24) return `Hace ${diffHours}h`;
+  if (diffDays < 7) return `Hace ${diffDays}d`;
+  return date.toLocaleDateString('es-GT');
 }
 
 const styles = StyleSheet.create({
@@ -304,61 +351,105 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
   },
-  
+
   loadingText: {
     marginTop: SPACING.md,
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
   },
-  
-  categoriesContainer: {
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
     backgroundColor: COLORS.white,
-    paddingVertical: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray[200],
   },
-  
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    marginHorizontal: SPACING.xs,
-    backgroundColor: COLORS.gray[100],
-    borderRadius: RADIUS.full,
+
+  backButton: {
+    padding: SPACING.sm,
+    marginRight: SPACING.sm,
   },
-  
-  categoryChipActive: {
-    backgroundColor: COLORS.primary,
-  },
-  
-  categoryIcon: {
-    fontSize: FONT_SIZES.lg,
-    marginRight: SPACING.xs,
-  },
-  
-  categoryName: {
-    fontSize: FONT_SIZES.sm,
+
+  backIcon: {
+    fontSize: FONT_SIZES['2xl'],
     color: COLORS.text.primary,
   },
-  
-  categoryNameActive: {
+
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.gray[50],
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+  },
+
+  searchInput: {
+    flex: 1,
+    fontSize: FONT_SIZES.base,
+    color: COLORS.text.primary,
+    paddingVertical: SPACING.sm,
+  },
+
+  filterButton: {
+    position: 'relative',
+    padding: SPACING.xs,
+  },
+
+  filterIcon: {
+    fontSize: FONT_SIZES.lg,
+  },
+
+  filterBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: COLORS.error,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  filterBadgeText: {
     color: COLORS.white,
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+
+  resultsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.md,
+    backgroundColor: COLORS.white,
+  },
+
+  resultsCount: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
+  },
+
+  clearFiltersText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
     fontWeight: '600',
   },
-  
+
   listContent: {
     flexGrow: 1,
     padding: SPACING.md,
   },
-  
+
   jobCard: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
@@ -367,191 +458,158 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 4,
     elevation: 3,
   },
-  
-  jobHeader: {
-    marginBottom: SPACING.sm,
-  },
-  
-  jobTitleContainer: {
+
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
   },
-  
-  jobTitle: {
-    flex: 1,
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.text.primary,
-    marginRight: SPACING.sm,
-  },
-  
-  urgencyBadge: {
+
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.gray[100],
     paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs / 2,
+    paddingVertical: SPACING.xs,
     borderRadius: RADIUS.sm,
   },
-  
-  urgencyText: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.white,
-    fontWeight: '600',
-  },
-  
-  jobCategory: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  
-  jobCategoryText: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.text.secondary,
-    marginLeft: SPACING.xs,
-  },
-  
-  jobDescription: {
-    fontSize: FONT_SIZES.base,
-    color: COLORS.text.secondary,
-    lineHeight: 20,
-    marginBottom: SPACING.md,
-  },
-  
-  jobInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.md,
-    paddingTop: SPACING.sm,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray[100],
-  },
-  
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  
-  infoIcon: {
+
+  categoryIcon: {
     fontSize: FONT_SIZES.base,
     marginRight: SPACING.xs,
   },
-  
-  infoText: {
+
+  categoryName: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
   },
-  
-  jobFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: SPACING.sm,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray[100],
+
+  distanceBadge: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    backgroundColor: COLORS.info + '20',
+    borderRadius: RADIUS.sm,
   },
-  
-  clientInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  
-  clientName: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.text.primary,
-    fontWeight: '500',
-  },
-  
-  clientRating: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.warning,
-    marginLeft: SPACING.sm,
-  },
-  
-  jobDate: {
+
+  distanceText: {
     fontSize: FONT_SIZES.xs,
-    color: COLORS.text.secondary,
+    color: COLORS.info,
+    fontWeight: '600',
   },
-  
-  applicationsCount: {
-    marginTop: SPACING.sm,
-    paddingTop: SPACING.sm,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray[100],
-  },
-  
-  applicationsText: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.primary,
-    fontWeight: '500',
-  },
-  
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: SPACING.xl * 2,
-  },
-  
-  emptyIcon: {
-    fontSize: 60,
-    marginBottom: SPACING.md,
-  },
-  
-  emptyTitle: {
+
+  jobTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '600',
     color: COLORS.text.primary,
     marginBottom: SPACING.xs,
   },
-  
+
+  jobDescription: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
+    lineHeight: 20,
+    marginBottom: SPACING.sm,
+  },
+
+  jobInfo: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  infoIcon: {
+    fontSize: FONT_SIZES.base,
+    marginRight: 4,
+  },
+
+  infoText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
+  },
+
+  urgencyBadge: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.sm,
+  },
+
+  urgencyText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+  },
+
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray[100],
+  },
+
+  timeAgo: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.text.secondary,
+  },
+
+  applicationsCount: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SPACING['2xl'],
+  },
+
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: SPACING.md,
+  },
+
+  emptyTitle: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+    marginBottom: SPACING.sm,
+  },
+
   emptyText: {
     fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
     textAlign: 'center',
-    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.md,
   },
-  
-  clearFilterButton: {
-    marginTop: SPACING.lg,
+
+  clearButton: {
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.md,
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.md,
   },
-  
-  clearFilterText: {
-    color: COLORS.white,
+
+  clearButtonText: {
     fontSize: FONT_SIZES.base,
+    color: COLORS.white,
     fontWeight: '600',
   },
-  
+
   footerLoader: {
-    paddingVertical: SPACING.lg,
-  },
-  
-  fab: {
-    position: 'absolute',
-    right: SPACING.lg,
-    bottom: SPACING.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
+    paddingVertical: SPACING.md,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
-  },
-  
-  fabText: {
-    fontSize: FONT_SIZES['2xl'],
-    color: COLORS.white,
-    fontWeight: '300',
   },
 });

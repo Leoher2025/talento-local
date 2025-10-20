@@ -4,7 +4,7 @@ import { API_URL } from '../utils/constants';
 
 class JobService {
   constructor() {
-    this.baseURL = API_URL || 'http://192.168.101.14:5000/api';
+    this.baseURL = API_URL || 'http://192.168.101.12:5000/api';
   }
 
   // Método genérico para hacer peticiones
@@ -69,21 +69,67 @@ class JobService {
   // TRABAJOS
   // ============================
 
-  // Obtener lista de trabajos con filtros
+  // Obtener trabajos con filtros avanzados
   async getJobs(filters = {}) {
     try {
       const queryParams = new URLSearchParams();
 
-      // Agregar filtros si existen
-      Object.keys(filters).forEach(key => {
-        if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
-          queryParams.append(key, filters[key]);
+      // Búsqueda de texto
+      if (filters.search) {
+        queryParams.append('search', filters.search);
+      }
+
+      // Categoría
+      if (filters.categoryId) {
+        queryParams.append('categoryId', filters.categoryId);
+      }
+
+      // Ubicación
+      if (filters.city) {
+        queryParams.append('city', filters.city);
+      }
+      if (filters.department) {
+        queryParams.append('department', filters.department);
+      }
+
+      // Presupuesto
+      if (filters.budgetMin !== undefined) {
+        queryParams.append('budgetMin', filters.budgetMin);
+      }
+      if (filters.budgetMax !== undefined) {
+        queryParams.append('budgetMax', filters.budgetMax);
+      }
+      if (filters.budgetType) {
+        queryParams.append('budgetType', filters.budgetType);
+      }
+
+      // Urgencia
+      if (filters.urgency) {
+        queryParams.append('urgency', filters.urgency);
+      }
+
+      // Coordenadas para búsqueda por distancia
+      if (filters.latitude && filters.longitude) {
+        queryParams.append('latitude', filters.latitude);
+        queryParams.append('longitude', filters.longitude);
+        if (filters.radiusKm) {
+          queryParams.append('radiusKm', filters.radiusKm);
         }
-      });
+      }
 
-      const queryString = queryParams.toString();
-      const endpoint = `/jobs${queryString ? `?${queryString}` : ''}`;
+      // Ordenamiento
+      if (filters.sortBy) {
+        queryParams.append('sortBy', filters.sortBy);
+      }
+      if (filters.sortOrder) {
+        queryParams.append('sortOrder', filters.sortOrder);
+      }
 
+      // Paginación
+      queryParams.append('page', filters.page || 1);
+      queryParams.append('limit', filters.limit || 20);
+
+      const endpoint = `/jobs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await this.fetchAPI(endpoint);
 
       return {
@@ -93,7 +139,8 @@ class JobService {
           page: 1,
           limit: 20,
           totalPages: 1
-        }
+        },
+        filters: response.filters || {}
       };
     } catch (error) {
       console.error('Error obteniendo trabajos:', error);
@@ -106,6 +153,39 @@ class JobService {
           totalPages: 1
         }
       };
+    }
+  }
+
+  // Obtener ubicaciones disponibles
+  async getLocations() {
+    try {
+      const response = await this.fetchAPI('/jobs/locations');
+      return response.data || [];
+    } catch (error) {
+      console.error('Error obteniendo ubicaciones:', error);
+      return [];
+    }
+  }
+
+  // Obtener rangos de presupuesto
+  async getBudgetRanges() {
+    try {
+      const response = await this.fetchAPI('/jobs/budget-ranges');
+      return response.data || [];
+    } catch (error) {
+      console.error('Error obteniendo rangos:', error);
+      return [];
+    }
+  }
+
+  // Obtener estadísticas de búsqueda
+  async getSearchStats() {
+    try {
+      const response = await this.fetchAPI('/jobs/search-stats');
+      return response.data || {};
+    } catch (error) {
+      console.error('Error obteniendo estadísticas:', error);
+      return {};
     }
   }
 

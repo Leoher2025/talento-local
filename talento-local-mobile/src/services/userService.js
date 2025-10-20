@@ -30,7 +30,7 @@ class UserService {
       };
 
       console.log('Fetching:', url);
-      
+
       const response = await fetch(url, options);
       const data = await response.json();
 
@@ -96,20 +96,20 @@ class UserService {
   async uploadProfilePicture(imageUri) {
     try {
       const formData = new FormData();
-      
+
       // Preparar imagen para upload
       const filename = imageUri.split('/').pop();
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
-      
+
       formData.append('profilePicture', {
         uri: imageUri,
         name: filename,
         type: type
       });
-      
+
       const token = await AsyncStorage.getItem('accessToken');
-      
+
       const response = await fetch(`${this.baseURL}/profiles/upload-picture`, {
         method: 'POST',
         headers: {
@@ -118,13 +118,13 @@ class UserService {
         },
         body: formData
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.message || 'Error al subir la imagen');
       }
-      
+
       return data;
     } catch (error) {
       console.error('Error subiendo foto de perfil:', error);
@@ -164,7 +164,7 @@ class UserService {
   async uploadGalleryPhoto(imageUri, caption = '') {
     try {
       const formData = new FormData();
-      
+
       const filename = imageUri.split('/').pop();
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
@@ -174,13 +174,13 @@ class UserService {
         name: filename,
         type: type
       });
-      
+
       if (caption) {
         formData.append('caption', caption);
       }
 
       const token = await AsyncStorage.getItem('accessToken');
-      
+
       const response = await fetch(`${this.baseURL}/profiles/gallery`, {
         method: 'POST',
         headers: {
@@ -191,7 +191,7 @@ class UserService {
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.message || 'Error al subir la imagen');
       }
@@ -238,7 +238,7 @@ class UserService {
   async requestIdentityVerification(documentData) {
     try {
       const formData = new FormData();
-      
+
       // Documento frontal
       if (documentData.frontImage) {
         formData.append('documentFront', {
@@ -261,7 +261,7 @@ class UserService {
       formData.append('documentType', documentData.type);
 
       const token = await AsyncStorage.getItem('accessToken');
-      
+
       const response = await fetch(`${this.baseURL}/profiles/verify-identity`, {
         method: 'POST',
         headers: {
@@ -272,7 +272,7 @@ class UserService {
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.message || 'Error en la verificación');
       }
@@ -327,6 +327,31 @@ class UserService {
       return response;
     } catch (error) {
       console.error('Error actualizando privacidad:', error);
+      throw error;
+    }
+  }
+
+  // Obtener categorías del trabajador
+  async getWorkerCategories() {
+    try {
+      const response = await this.fetchAPI('/profiles/categories');
+      return response.data || [];
+    } catch (error) {
+      console.error('Error obteniendo categorías del trabajador:', error);
+      return [];
+    }
+  }
+
+  // Actualizar categorías del trabajador
+  async updateWorkerCategories(categories) {
+    try {
+      const response = await this.fetchAPI('/profiles/categories', {
+        method: 'PUT',
+        body: JSON.stringify({ categories })
+      });
+      return response;
+    } catch (error) {
+      console.error('Error actualizando categorías:', error);
       throw error;
     }
   }

@@ -42,6 +42,10 @@ import UserReviewsScreen from '../screens/reviews/UserReviewsScreen';
 // Pantallas de Notificaciones
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 
+// Pantallas de Busqueda de Trabajadores
+import WorkersSearchScreen from '../screens/workers/WorkersSearchScreen';
+import WorkerProfileScreen from '../screens/workers/WorkerProfileScreen';
+
 const Stack = createNativeStackNavigator();
 
 // Stack de autenticación (usuarios no logueados)
@@ -246,6 +250,24 @@ const MainStack = () => {
         component={NotificationsScreen}
         options={{
           title: 'Notificaciones',
+          headerShown: false
+        }}
+      />
+      {/* Búsqueda de trabajadores (para clientes) */}
+      <Stack.Screen
+        name="WorkersSearch"
+        component={WorkersSearchScreen}
+        options={{
+          title: 'Buscar Trabajadores',
+          headerShown: false
+        }}
+      />
+      {/* Perfil de trabajador */}
+      <Stack.Screen
+        name="WorkerProfile"
+        component={WorkerProfileScreen}
+        options={{
+          title: 'Perfil del Trabajador',
           headerShown: false
         }}
       />

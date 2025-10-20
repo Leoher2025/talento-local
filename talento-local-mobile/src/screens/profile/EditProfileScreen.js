@@ -21,19 +21,14 @@ import { useAuth } from '../../context/AuthContext';
 import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES, API_URL, STATIC_URL } from '../../utils/constants';
 import Toast from 'react-native-toast-message';
 import userService from '../../services/userService';
+import CategorySelector from '../../components/CategorySelector';
 
 export default function EditProfileScreen({ navigation }) {
-  // Solo obtener el user del contexto, no updateUser
-
-  /*console.log('=== DEBUG AuthContext ===');
-  console.log('AuthContext completo:', useAuth);
-  console.log('Tipo de authContext:', typeof useAuth);
-  console.log('Claves disponibles:', Object.keys(useAuth || {}));
-  console.log('updateUser existe?:', 'updateUser' in (useAuth || {}));
-  console.log('=== FIN DEBUG ===');*/
 
   const { user, refreshUserData } = useAuth();
 
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
@@ -52,6 +47,42 @@ export default function EditProfileScreen({ navigation }) {
     state: '',
     address: '',
   });
+
+  useEffect(() => {
+    loadProfile();
+    if (user?.role === 'worker') {
+      loadWorkerCategories();
+    }
+  }, []);
+
+  const loadWorkerCategories = async () => {
+    try {
+      const categories = await userService.getWorkerCategories();
+      setSelectedCategories(categories);
+    } catch (error) {
+      console.error('Error cargando categorías:', error);
+    }
+  };
+
+  const handleCategoriesChange = async (categories) => {
+    try {
+      setSelectedCategories(categories);
+      // Guardar inmediatamente
+      await userService.updateWorkerCategories(categories);
+      Toast.show({
+        type: 'success',
+        text1: 'Habilidades actualizadas',
+        text2: 'Tus categorías se han guardado correctamente',
+      });
+    } catch (error) {
+      console.error('Error guardando categorías:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudieron guardar las categorías',
+      });
+    }
+  };
 
   useEffect(() => {
     loadProfile();
@@ -390,18 +421,43 @@ export default function EditProfileScreen({ navigation }) {
               <>
                 <Text style={styles.sectionTitle}>Información Profesional</Text>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Habilidades</Text>
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    value={formData.skills}
-                    onChangeText={(text) => updateFormField('skills', text)}
-                    placeholder="Ej: Plomería, Electricidad, Carpintería..."
-                    placeholderTextColor={COLORS.text.secondary}
-                    multiline
-                    numberOfLines={3}
-                    textAlignVertical="top"
-                  />
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Habilidades y Categorías</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    Selecciona las áreas en las que tienes experiencia
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.categorySelectorButton}
+                    onPress={() => setShowCategorySelector(true)}
+                  >
+                    <Text style={styles.categorySelectorIcon}>🏷️</Text>
+                    <View style={styles.categorySelectorContent}>
+                      <Text style={styles.categorySelectorTitle}>
+                        {selectedCategories.length > 0
+                          ? `${selectedCategories.length} ${selectedCategories.length === 1 ? 'categoría seleccionada' : 'categorías seleccionadas'}`
+                          : 'Seleccionar categorías'}
+                      </Text>
+                      {selectedCategories.length > 0 && (
+                        <View style={styles.selectedCategoriesPreview}>
+                          {selectedCategories.slice(0, 3).map((cat, index) => (
+                            <View key={index} style={styles.previewChip}>
+                              <Text style={styles.previewChipText}>
+                                {cat.category_icon} {cat.category_name}
+                                {cat.is_primary && ' ⭐'}
+                              </Text>
+                            </View>
+                          ))}
+                          {selectedCategories.length > 3 && (
+                            <Text style={styles.moreCategories}>
+                              +{selectedCategories.length - 3} más
+                            </Text>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.categorySelectorArrow}>→</Text>
+                  </TouchableOpacity>
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -470,6 +526,13 @@ export default function EditProfileScreen({ navigation }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      {/* ✅ AGREGAR: Modal de selector de categorías */}
+      <CategorySelector
+        visible={showCategorySelector}
+        onClose={() => setShowCategorySelector(false)}
+        selectedCategories={selectedCategories}
+        onCategoriesChange={handleCategoriesChange}
+      />
     </SafeAreaView>
   );
 }
@@ -642,5 +705,63 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: 'top',
     paddingTop: SPACING.sm,
+  },
+
+  categorySelectorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.gray[300],
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+
+  categorySelectorIcon: {
+    fontSize: FONT_SIZES['2xl'],
+    marginRight: SPACING.md,
+  },
+
+  categorySelectorContent: {
+    flex: 1,
+  },
+
+  categorySelectorTitle: {
+    fontSize: FONT_SIZES.base,
+    color: COLORS.text.primary,
+    fontWeight: '500',
+    marginBottom: SPACING.xs,
+  },
+
+  selectedCategoriesPreview: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+    marginTop: SPACING.xs,
+  },
+
+  previewChip: {
+    backgroundColor: COLORS.primary + '20',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs / 2,
+    borderRadius: RADIUS.sm,
+  },
+
+  previewChipText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+
+  moreCategories: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.text.secondary,
+    alignSelf: 'center',
+  },
+
+  categorySelectorArrow: {
+    fontSize: FONT_SIZES.xl,
+    color: COLORS.text.secondary,
   },
 });

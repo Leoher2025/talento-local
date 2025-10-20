@@ -262,22 +262,19 @@ const ClientHomeView = ({ navigation }) => {
       {/* Búsqueda rápida */}
       <TouchableOpacity
         style={styles.searchContainer}
-        onPress={() => navigation.navigate('JobsList')}
+        onPress={() => navigation.navigate('WorkersSearch')}
       >
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Text style={styles.searchIcon}>👷</Text>
         <Text style={styles.searchPlaceholder}>
           Buscar profesionales...
         </Text>
       </TouchableOpacity>
 
-      {/* Accesos rápidos */}
+      {/* Accesos rápidos principales */}
       <View style={styles.quickActions}>
         <TouchableOpacity
           style={styles.quickActionCard}
-          onPress={() => {
-            console.log('Navegando a CreateJob...');
-            navigation.navigate('CreateJob');
-          }}
+          onPress={() => navigation.navigate('CreateJob')}
         >
           <Text style={styles.quickActionIcon}>➕</Text>
           <Text style={styles.quickActionText}>Publicar Trabajo</Text>
@@ -297,7 +294,7 @@ const ClientHomeView = ({ navigation }) => {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Categorías Populares</Text>
           <TouchableOpacity
-            onPress={() => navigation.navigate('JobsList')}
+            onPress={() => navigation.navigate('WorkersSearch')}
           >
             <Text style={styles.sectionLink}>Ver todas →</Text>
           </TouchableOpacity>
@@ -308,7 +305,7 @@ const ClientHomeView = ({ navigation }) => {
               key={category.id}
               style={styles.categoryCard}
               activeOpacity={0.7}
-              onPress={() => navigation.navigate('JobsList', { categoryId: category.id })}
+              onPress={() => navigation.navigate('WorkersSearch', { categoryId: category.id })}
             >
               <Text style={styles.categoryIcon}>{category.icon}</Text>
               <Text style={styles.categoryName}>{category.name}</Text>
@@ -328,24 +325,12 @@ const ClientHomeView = ({ navigation }) => {
         </View>
       </View>
 
-      // Boton para ir a Conversaciones
-      <TouchableOpacity
-        style={styles.chatButton}
-        onPress={() => navigation.navigate('ConversationsScreen')}
-      >
-        <Text style={styles.chatIcon}>💬</Text>
-        <Text style={styles.buttonText}>Mis Mensajes</Text>
-      </TouchableOpacity>
-
-      {/* Botón de publicar trabajo */}
+      {/* Boton para ir a Conversaciones */}
       <TouchableOpacity
         style={styles.floatingButton}
-        onPress={() => {
-          console.log('Botón flotante presionado, navegando a CreateJob...');
-          navigation.navigate('CreateJob');
-        }}
+        onPress={() => navigation.navigate('ConversationsScreen')}
       >
-        <Text style={styles.floatingButtonText}>+ Publicar Trabajo</Text>
+        <Text style={styles.floatingButtonText}>💬 Mis Mensajes</Text>
       </TouchableOpacity>
     </View>
   );

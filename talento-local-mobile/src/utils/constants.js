@@ -16,7 +16,7 @@
 // - Emulador iOS: usa localhost o 127.0.0.1
 
 // Para llamadas a la API
-export const API_BASE_URL = 'http://192.168.101.14:5000';
+export const API_BASE_URL = 'http://192.168.101.12:5000';
 export const API_URL = `${API_BASE_URL}/api`;
 
 // Para recursos estáticos (imágenes, archivos)
@@ -107,16 +107,16 @@ export const RADIUS = {
 // CATEGORÍAS DE TRABAJO
 // ============================
 export const JOB_CATEGORIES = [
-  { id: 'plomeria', name: 'Plomería', icon: '🔧' },
-  { id: 'electricidad', name: 'Electricidad', icon: '⚡' },
-  { id: 'albanileria', name: 'Albañilería', icon: '🧱' },
-  { id: 'carpinteria', name: 'Carpintería', icon: '🔨' },
-  { id: 'pintura', name: 'Pintura', icon: '🎨' },
-  { id: 'jardineria', name: 'Jardinería', icon: '🌿' },
-  { id: 'limpieza', name: 'Limpieza', icon: '🧹' },
-  { id: 'cerrajeria', name: 'Cerrajería', icon: '🔐' },
-  { id: 'mecanica', name: 'Mecánica', icon: '🔩' },
-  { id: 'otros', name: 'Otros', icon: '📋' },
+  { id: '0c2c6c55-e574-49ff-9beb-810303354963', name: 'Plomería', icon: '🔧' },
+  { id: '9d41a671-5470-49ae-b000-923d0882c537', name: 'Electricidad', icon: '⚡' },
+  { id: 'fe4e7731-4c21-4b3c-a019-5de60b9012c3', name: 'Albañilería', icon: '🧱' },
+  { id: 'b15ed149-14e7-49b1-8c0e-e7a2e54528a5', name: 'Carpintería', icon: '🔨' },
+  { id: '5002566e-5928-438d-a0f1-f4f79822d66e', name: 'Pintura', icon: '🎨' },
+  { id: '2fd6f734-9015-4d90-9ebd-7e3f5b698239', name: 'Jardinería', icon: '🌿' },
+  { id: 'aecda292-523f-4b11-8e38-e572c857549c', name: 'Limpieza', icon: '🧹' },
+  { id: 'e8719eb9-3ea6-4e73-8fca-03bde340afb2', name: 'Cerrajería', icon: '🔐' },
+  { id: '8db6747a-6b4a-4fab-910e-24b11f24ddc4', name: 'Mecánica', icon: '🔩' },
+  { id: 'dfbf4893-b210-4fb7-a9c2-4af0f0aee3ed', name: 'Otros', icon: '📋' },
 ];
 
 // ============================

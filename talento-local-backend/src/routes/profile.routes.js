@@ -25,6 +25,12 @@ router.put(
   ProfileController.updateProfile
 );
 
+// GET /api/profile/categories - Obtener categorías del trabajador
+router.get('/categories', authenticate, ProfileController.getWorkerCategories);
+
+// PUT /api/profile/categories - Actualizar categorías del trabajador
+router.put('/categories', authenticate, ProfileController.updateWorkerCategories);
+
 // Obtener perfil por ID (público con restricciones)
 router.get(
   '/:userId',

@@ -2,6 +2,7 @@
 const JobModel = require('../models/job.model');
 const logger = require('../utils/logger');
 const NotificationHelpers = require('../utils/notificationHelpers');
+const { query } = require('../config/database');
 
 class JobController {
   // ============================
@@ -57,20 +58,22 @@ class JobController {
   }
 
   // ============================
-  // OBTENER LISTA DE TRABAJOS
+  // OBTENER TODOS LOS TRABAJOS ACTIVOS (CON FILTROS)
   // ============================
   static async getAll(req, res, next) {
     try {
       const filters = {
+        search: req.query.search,
         categoryId: req.query.categoryId,
         city: req.query.city,
         department: req.query.department,
-        urgency: req.query.urgency,
         budgetMin: req.query.budgetMin ? parseFloat(req.query.budgetMin) : undefined,
         budgetMax: req.query.budgetMax ? parseFloat(req.query.budgetMax) : undefined,
+        budgetType: req.query.budgetType,
+        urgency: req.query.urgency,
         latitude: req.query.latitude ? parseFloat(req.query.latitude) : undefined,
         longitude: req.query.longitude ? parseFloat(req.query.longitude) : undefined,
-        radiusKm: req.query.radiusKm ? parseInt(req.query.radiusKm) : 10,
+        radiusKm: req.query.radiusKm ? parseInt(req.query.radiusKm) : 50,
         page: req.query.page ? parseInt(req.query.page) : 1,
         limit: req.query.limit ? parseInt(req.query.limit) : 20,
         sortBy: req.query.sortBy || 'created_at',
@@ -82,7 +85,8 @@ class JobController {
       res.json({
         success: true,
         data: result.jobs,
-        pagination: result.pagination
+        pagination: result.pagination,
+        filters: filters // Retornar filtros aplicados
       });
     } catch (error) {
       logger.error('Error obteniendo trabajos:', error);
@@ -390,6 +394,77 @@ class JobController {
       });
     } catch (error) {
       logger.error('Error obteniendo categorías:', error);
+      next(error);
+    }
+  }
+
+  // ============================
+  // OBTENER UBICACIONES DISPONIBLES
+  // ============================
+  static async getLocations(req, res, next) {
+    try {
+      const locations = await JobModel.getAvailableLocations();
+
+      res.json({
+        success: true,
+        data: locations
+      });
+    } catch (error) {
+      logger.error('Error obteniendo ubicaciones:', error);
+      next(error);
+    }
+  }
+
+  // ============================
+  // OBTENER RANGOS DE PRESUPUESTO
+  // ============================
+  static async getBudgetRanges(req, res, next) {
+    try {
+      const ranges = await JobModel.getBudgetRanges();
+
+      res.json({
+        success: true,
+        data: ranges
+      });
+    } catch (error) {
+      logger.error('Error obteniendo rangos de presupuesto:', error);
+      next(error);
+    }
+  }
+
+  // ============================
+  // OBTENER ESTADÍSTICAS DE BÚSQUEDA
+  // ============================
+  static async getSearchStats(req, res, next) {
+    try {
+      const stats = await query(`
+      SELECT 
+        COUNT(*) as total_jobs,
+        COUNT(DISTINCT category_id) as total_categories,
+        COUNT(DISTINCT city) as total_cities,
+        AVG(budget_amount) as avg_budget
+      FROM jobs
+      WHERE status = 'active'
+    `);
+
+      const urgencyStats = await query(`
+      SELECT 
+        urgency,
+        COUNT(*) as count
+      FROM jobs
+      WHERE status = 'active'
+      GROUP BY urgency
+    `);
+
+      res.json({
+        success: true,
+        data: {
+          ...stats.rows[0],
+          urgency_distribution: urgencyStats.rows
+        }
+      });
+    } catch (error) {
+      logger.error('Error obteniendo estadísticas:', error);
       next(error);
     }
   }

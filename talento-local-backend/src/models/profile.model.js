@@ -372,6 +372,270 @@ class ProfileModel {
     }
   }
 
+  // ============================
+// BUSCAR TRABAJADORES CON FILTROS
+// ============================
+static async searchWorkers(filters = {}) {
+  try {
+    const {
+      search,
+      categoryId,
+      city,
+      department,
+      minRating,
+      latitude,
+      longitude,
+      radiusKm = 50,
+      sortBy = 'rating_average',
+      sortOrder = 'DESC',
+      page = 1,
+      limit = 20
+    } = filters;
+
+    let whereConditions = ["u.role = 'worker'", "u.is_active = true"];
+    let queryParams = [];
+    let paramIndex = 1;
+    let joins = `LEFT JOIN users u ON p.user_id = u.id`;
+
+    // Filtro por categoría
+    if (categoryId) {
+      joins += ` INNER JOIN worker_categories wc ON u.id = wc.worker_id`;
+      whereConditions.push(`wc.category_id = $${paramIndex}`);
+      queryParams.push(categoryId);
+      paramIndex++;
+    }
+
+    // Búsqueda de texto
+    if (search && search.trim()) {
+      whereConditions.push(
+        `(p.first_name ILIKE $${paramIndex} OR p.last_name ILIKE $${paramIndex} OR p.skills ILIKE $${paramIndex} OR p.bio ILIKE $${paramIndex})`
+      );
+      queryParams.push(`%${search.trim()}%`);
+      paramIndex++;
+    }
+
+    // Filtro por ciudad
+    if (city) {
+      whereConditions.push(`p.city ILIKE $${paramIndex}`);
+      queryParams.push(`%${city}%`);
+      paramIndex++;
+    }
+
+    // Filtro por departamento
+    if (department) {
+      whereConditions.push(`p.department ILIKE $${paramIndex}`);
+      queryParams.push(`%${department}%`);
+      paramIndex++;
+    }
+
+    // Filtro por rating mínimo
+    if (minRating) {
+      whereConditions.push(`p.rating_average >= $${paramIndex}`);
+      queryParams.push(minRating);
+      paramIndex++;
+    }
+
+    // Agregar cálculo de distancia si hay coordenadas
+    let distanceSelect = '';
+    if (latitude && longitude) {
+      distanceSelect = `,
+        (
+          6371 * acos(
+            cos(radians($${paramIndex})) * 
+            cos(radians(p.latitude)) * 
+            cos(radians(p.longitude) - radians($${paramIndex + 1})) + 
+            sin(radians($${paramIndex})) * 
+            sin(radians(p.latitude))
+          )
+        ) as distance_km
+      `;
+      queryParams.push(latitude, longitude);
+      paramIndex += 2;
+
+      if (radiusKm) {
+        whereConditions.push(`
+          (
+            6371 * acos(
+              cos(radians($${paramIndex - 2})) * 
+              cos(radians(p.latitude)) * 
+              cos(radians(p.longitude) - radians($${paramIndex - 1})) + 
+              sin(radians($${paramIndex - 2})) * 
+              sin(radians(p.latitude))
+            )
+          ) <= ${radiusKm}
+        `);
+      }
+    }
+
+    // Ordenamiento
+    const validSortFields = {
+      'rating_average': 'p.rating_average',
+      'completed_jobs': 'completed_jobs',
+      'created_at': 'p.created_at',
+      'distance': 'distance_km'
+    };
+
+    let orderByClause = 'p.rating_average DESC';
+    
+    if (validSortFields[sortBy]) {
+      const sortField = validSortFields[sortBy];
+      const order = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+      orderByClause = `${sortField} ${order}`;
+      
+      if (sortBy === 'distance' && (!latitude || !longitude)) {
+        orderByClause = 'p.rating_average DESC';
+      }
+    }
+
+    // Paginación
+    const offset = (page - 1) * limit;
+
+    // Query principal (con categorías)
+    const mainQuery = `
+      SELECT DISTINCT ON (p.user_id)
+        p.*,
+        u.email,
+        u.role,
+        u.verification_status,
+        (
+          SELECT COUNT(*) 
+          FROM jobs 
+          WHERE assigned_worker_id = u.id AND status = 'completed'
+        ) as completed_jobs,
+        (
+          SELECT COUNT(*) 
+          FROM reviews 
+          WHERE reviewee_id = u.id
+        ) as total_reviews
+        ${distanceSelect}
+      FROM profiles p
+      ${joins}
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY p.user_id, ${orderByClause}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    queryParams.push(limit, offset);
+
+    // ✅ Query de conteo (SIN columnas JSON, solo contar)
+    const countQuery = `
+      SELECT COUNT(DISTINCT p.user_id) as total
+      FROM profiles p
+      ${joins}
+      WHERE ${whereConditions.join(' AND ')}
+    `;
+
+    const [workersResult, countResult] = await Promise.all([
+      query(mainQuery, queryParams),
+      query(countQuery, queryParams.slice(0, -2))
+    ]);
+
+    // ✅ Obtener categorías por separado para cada trabajador
+    const workersWithCategories = await Promise.all(
+      workersResult.rows.map(async (worker) => {
+        const categoriesResult = await query(
+          `SELECT 
+            wc.category_id,
+            c.name as category_name,
+            c.icon as category_icon,
+            wc.experience_years,
+            wc.is_primary
+           FROM worker_categories wc
+           INNER JOIN categories c ON wc.category_id = c.id
+           WHERE wc.worker_id = $1
+           ORDER BY wc.is_primary DESC, wc.created_at ASC`,
+          [worker.user_id]
+        );
+
+        return {
+          ...worker,
+          categories: categoriesResult.rows
+        };
+      })
+    );
+
+    const total = parseInt(countResult.rows[0].total);
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      workers: workersWithCategories,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages
+      }
+    };
+  } catch (error) {
+    logger.error('Error buscando trabajadores:', error);
+    throw error;
+  }
+}
+  // ============================
+  // OBTENER CATEGORÍAS DEL TRABAJADOR
+  // ============================
+  static async getWorkerCategories(userId) {
+    try {
+      const result = await query(
+        `SELECT 
+        wc.*,
+        c.name as category_name,
+        c.icon as category_icon
+       FROM worker_categories wc
+       INNER JOIN categories c ON wc.category_id = c.id
+       WHERE wc.worker_id = $1
+       ORDER BY wc.is_primary DESC, wc.created_at ASC`,
+        [userId]
+      );
+
+      return result.rows;
+    } catch (error) {
+      logger.error('Error obteniendo categorías del trabajador:', error);
+      throw error;
+    }
+  }
+
+  // ============================
+  // ACTUALIZAR CATEGORÍAS DEL TRABAJADOR
+  // ============================
+  static async updateWorkerCategories(userId, categories) {
+    try {
+      // categories es un array de objetos: [{ categoryId, experienceYears, isPrimary }]
+
+      // Eliminar categorías existentes
+      await query(
+        'DELETE FROM worker_categories WHERE worker_id = $1',
+        [userId]
+      );
+
+      // Insertar nuevas categorías
+      if (categories && categories.length > 0) {
+        const values = categories.map((cat, index) => {
+          const baseIndex = index * 4 + 1;
+          return `($${baseIndex}, $${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3})`;
+        }).join(', ');
+
+        const params = categories.flatMap(cat => [
+          userId,
+          cat.categoryId,
+          cat.experienceYears || 0,
+          cat.isPrimary || false
+        ]);
+
+        await query(
+          `INSERT INTO worker_categories (worker_id, category_id, experience_years, is_primary)
+         VALUES ${values}`,
+          params
+        );
+      }
+
+      logger.info(`Categorías actualizadas para trabajador ${userId}`);
+      return true;
+    } catch (error) {
+      logger.error('Error actualizando categorías del trabajador:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = ProfileModel;

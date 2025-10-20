@@ -12,6 +12,15 @@ const { validateCreateJob, validateUpdateJob, validateJobFilters } = require('..
 // GET /api/jobs/categories - Obtener todas las categorías
 router.get('/categories', JobController.getCategories);
 
+// GET /api/jobs/locations - Obtener ubicaciones disponibles
+router.get('/locations', JobController.getLocations);
+
+// GET /api/jobs/budget-ranges - Obtener rangos de presupuesto
+router.get('/budget-ranges', JobController.getBudgetRanges);
+
+// GET /api/jobs/search-stats - Obtener estadísticas
+router.get('/search-stats', JobController.getSearchStats);
+
 // GET /api/jobs - Obtener lista de trabajos activos (con filtros opcionales)
 router.get(
   '/',

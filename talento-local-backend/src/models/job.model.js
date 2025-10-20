@@ -85,157 +85,204 @@ class JobModel {
   }
 
   // ============================
-  // OBTENER TRABAJOS ACTIVOS
+  // OBTENER TRABAJOS ACTIVOS CON FILTROS AVANZADOS
   // ============================
   static async getActiveJobs(filters = {}) {
     try {
       const {
-        categoryId,
-        city,
-        department,
-        urgency,
-        budgetMin,
-        budgetMax,
-        latitude,
+        search,           // Búsqueda de texto
+        categoryId,       // Filtro por categoría
+        city,            // Ciudad específica
+        department,      // Departamento
+        budgetMin,       // Presupuesto mínimo
+        budgetMax,       // Presupuesto máximo
+        budgetType,      // Tipo: fixed, hourly, negotiable
+        urgency,         // Urgencia: low, medium, high, urgent
+        latitude,        // Para búsqueda por distancia
         longitude,
-        radiusKm = 10,
-        page = 1,
-        limit = 20,
+        radiusKm = 50,   // Radio de búsqueda en km
         sortBy = 'created_at',
-        sortOrder = 'DESC'
+        sortOrder = 'DESC',
+        page = 1,
+        limit = 20
       } = filters;
 
-      let whereConditions = ['j.status = $1'];
-      let values = ['active'];
-      let paramCount = 1;
+      let whereConditions = ["j.status = 'active'"];
+      let queryParams = [];
+      let paramIndex = 1;
 
-      // Filtros opcionales
+      // Búsqueda de texto en título y descripción
+      if (search && search.trim()) {
+        whereConditions.push(
+          `(j.title ILIKE $${paramIndex} OR j.description ILIKE $${paramIndex})`
+        );
+        queryParams.push(`%${search.trim()}%`);
+        paramIndex++;
+      }
+
+      // Filtro por categoría
       if (categoryId) {
-        paramCount++;
-        whereConditions.push(`j.category_id = $${paramCount}`);
-        values.push(categoryId);
+        whereConditions.push(`j.category_id = $${paramIndex}`);
+        queryParams.push(categoryId);
+        paramIndex++;
       }
 
+      // Filtro por ciudad
       if (city) {
-        paramCount++;
-        whereConditions.push(`LOWER(j.city) = LOWER($${paramCount})`);
-        values.push(city);
+        whereConditions.push(`j.city ILIKE $${paramIndex}`);
+        queryParams.push(`%${city}%`);
+        paramIndex++;
       }
 
+      // Filtro por departamento
       if (department) {
-        paramCount++;
-        whereConditions.push(`LOWER(j.department) = LOWER($${paramCount})`);
-        values.push(department);
+        whereConditions.push(`j.department ILIKE $${paramIndex}`);
+        queryParams.push(`%${department}%`);
+        paramIndex++;
       }
 
+      // Filtro por tipo de presupuesto
+      if (budgetType) {
+        whereConditions.push(`j.budget_type = $${paramIndex}`);
+        queryParams.push(budgetType);
+        paramIndex++;
+      }
+
+      // Filtro por rango de presupuesto
+      if (budgetMin !== undefined) {
+        whereConditions.push(`j.budget_amount >= $${paramIndex}`);
+        queryParams.push(budgetMin);
+        paramIndex++;
+      }
+
+      if (budgetMax !== undefined) {
+        whereConditions.push(`j.budget_amount <= $${paramIndex}`);
+        queryParams.push(budgetMax);
+        paramIndex++;
+      }
+
+      // Filtro por urgencia
       if (urgency) {
-        paramCount++;
-        whereConditions.push(`j.urgency = $${paramCount}`);
-        values.push(urgency);
+        whereConditions.push(`j.urgency = $${paramIndex}`);
+        queryParams.push(urgency);
+        paramIndex++;
       }
 
-      if (budgetMin) {
-        paramCount++;
-        whereConditions.push(`j.budget_amount >= $${paramCount}`);
-        values.push(budgetMin);
-      }
+      // Construcción de SELECT con distancia si hay coordenadas
+      let selectFields = `
+      j.*,
+      c.name as category_name,
+      c.icon as category_icon,
+      u.email as client_email,
+      p.first_name as client_first_name,
+      p.last_name as client_last_name,
+      p.profile_picture_url as client_picture,
+      p.rating_average as client_rating,
+      (
+        SELECT COUNT(*) 
+        FROM job_applications 
+        WHERE job_id = j.id
+      ) as applications_count
+    `;
 
-      if (budgetMax) {
-        paramCount++;
-        whereConditions.push(`j.budget_amount <= $${paramCount}`);
-        values.push(budgetMax);
-      }
-
-      // Filtro por distancia (si se proporcionan coordenadas)
-      let distanceSelect = '';
-      let distanceJoin = '';
-      let distanceWhere = '';
-      let distanceOrder = '';
-
+      // Agregar cálculo de distancia si hay coordenadas
       if (latitude && longitude) {
-        distanceSelect = `, 
-          ST_Distance(
-            ST_MakePoint(j.longitude, j.latitude)::geography,
-            ST_MakePoint($${paramCount + 1}, $${paramCount + 2})::geography
-          ) / 1000 as distance_km`;
+        selectFields += `,
+        (
+          6371 * acos(
+            cos(radians($${paramIndex})) * 
+            cos(radians(j.latitude)) * 
+            cos(radians(j.longitude) - radians($${paramIndex + 1})) + 
+            sin(radians($${paramIndex})) * 
+            sin(radians(j.latitude))
+          )
+        ) as distance_km
+      `;
+        queryParams.push(latitude, longitude);
+        paramIndex += 2;
 
-        distanceWhere = ` AND ST_DWithin(
-          ST_MakePoint(j.longitude, j.latitude)::geography,
-          ST_MakePoint($${paramCount + 1}, $${paramCount + 2})::geography,
-          $${paramCount + 3} * 1000
-        )`;
-
-        values.push(longitude, latitude, radiusKm);
-        paramCount += 3;
-
-        if (sortBy === 'distance') {
-          distanceOrder = 'distance_km';
+        // Filtrar por radio si se especificó
+        if (radiusKm) {
+          whereConditions.push(`
+          (
+            6371 * acos(
+              cos(radians($${paramIndex - 2})) * 
+              cos(radians(j.latitude)) * 
+              cos(radians(j.longitude) - radians($${paramIndex - 1})) + 
+              sin(radians($${paramIndex - 2})) * 
+              sin(radians(j.latitude))
+            )
+          ) <= ${radiusKm}
+        `);
         }
       }
 
-      // Construir query
-      const whereClause = whereConditions.join(' AND ');
-      const orderBy = distanceOrder || `j.${sortBy}`;
+      // Ordenamiento
+      const validSortFields = {
+        'created_at': 'j.created_at',
+        'budget_amount': 'j.budget_amount',
+        'urgency': 'j.urgency',
+        'distance': 'distance_km',
+        'title': 'j.title'
+      };
+
+      let orderByClause = 'j.created_at DESC';
+
+      if (validSortFields[sortBy]) {
+        const sortField = validSortFields[sortBy];
+        const order = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+        orderByClause = `${sortField} ${order}`;
+
+        // Si ordena por distancia, requiere coordenadas
+        if (sortBy === 'distance' && (!latitude || !longitude)) {
+          orderByClause = 'j.created_at DESC';
+        }
+      }
+
+      // Paginación
       const offset = (page - 1) * limit;
 
-      const selectQuery = `
-        SELECT 
-          j.*,
-          c.name as category_name,
-          c.icon as category_icon,
-          u.email as client_email,
-          p.first_name as client_first_name,
-          p.last_name as client_last_name,
-          p.profile_picture_url as client_picture,
-          p.rating_average as client_rating,
-          COALESCE(j.applications_count, 0) as applications_count,
-          array_agg(
-            DISTINCT jsonb_build_object(
-              'id', ji.id,
-              'url', ji.image_url,
-              'thumbnail', ji.thumbnail_url,
-              'caption', ji.caption
-            )
-          ) FILTER (WHERE ji.id IS NOT NULL) as images
-          ${distanceSelect}
-        FROM jobs j
-        LEFT JOIN categories c ON j.category_id = c.id
-        LEFT JOIN users u ON j.client_id = u.id
-        LEFT JOIN profiles p ON u.id = p.user_id
-        LEFT JOIN job_images ji ON j.id = ji.job_id
-        WHERE ${whereClause} ${distanceWhere}
-        GROUP BY j.id, c.name, c.icon, u.email, p.first_name, p.last_name, 
-                 p.profile_picture_url, p.rating_average
-        ORDER BY ${orderBy} ${sortOrder}
-        LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
-      `;
+      // Query principal
+      const mainQuery = `
+      SELECT ${selectFields}
+      FROM jobs j
+      LEFT JOIN categories c ON j.category_id = c.id
+      LEFT JOIN users u ON j.client_id = u.id
+      LEFT JOIN profiles p ON u.id = p.user_id
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY ${orderByClause}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
 
-      values.push(limit, offset);
+      queryParams.push(limit, offset);
 
-      // Query para contar total
+      // Query de conteo
       const countQuery = `
-        SELECT COUNT(*) as total
-        FROM jobs j
-        WHERE ${whereClause} ${distanceWhere}
-      `;
+      SELECT COUNT(*) as total
+      FROM jobs j
+      WHERE ${whereConditions.join(' AND ')}
+    `;
 
-      // Ejecutar queries
+      // Ejecutar ambas queries
       const [jobsResult, countResult] = await Promise.all([
-        query(selectQuery, values),
-        query(countQuery, values.slice(0, -2)) // Sin limit y offset
+        query(mainQuery, queryParams),
+        query(countQuery, queryParams.slice(0, -2)) // Sin limit y offset para el count
       ]);
+
+      const total = parseInt(countResult.rows[0].total);
+      const totalPages = Math.ceil(total / limit);
 
       return {
         jobs: jobsResult.rows,
         pagination: {
-          total: parseInt(countResult.rows[0].total),
           page,
           limit,
-          totalPages: Math.ceil(countResult.rows[0].total / limit)
+          total,
+          totalPages
         }
       };
     } catch (error) {
-      logger.error('Error obteniendo trabajos:', error);
+      logger.error('Error obteniendo trabajos activos:', error);
       throw error;
     }
   }
@@ -562,6 +609,51 @@ class JobModel {
       return result.rows;
     } catch (error) {
       logger.error('Error obteniendo trabajos del trabajador:', error);
+      throw error;
+    }
+  }
+
+  // ============================
+  // OBTENER UBICACIONES DISPONIBLES
+  // ============================
+  static async getAvailableLocations() {
+    try {
+      const result = await query(`
+      SELECT DISTINCT 
+        department,
+        array_agg(DISTINCT city ORDER BY city) as cities
+      FROM jobs
+      WHERE status = 'active'
+      GROUP BY department
+      ORDER BY department
+    `);
+
+      return result.rows;
+    } catch (error) {
+      logger.error('Error obteniendo ubicaciones:', error);
+      throw error;
+    }
+  }
+
+  // ============================
+  // OBTENER RANGOS DE PRESUPUESTO
+  // ============================
+  static async getBudgetRanges() {
+    try {
+      const result = await query(`
+      SELECT 
+        budget_type,
+        MIN(budget_amount) as min_amount,
+        MAX(budget_amount) as max_amount,
+        AVG(budget_amount) as avg_amount
+      FROM jobs
+      WHERE status = 'active' AND budget_amount IS NOT NULL
+      GROUP BY budget_type
+    `);
+
+      return result.rows;
+    } catch (error) {
+      logger.error('Error obteniendo rangos de presupuesto:', error);
       throw error;
     }
   }

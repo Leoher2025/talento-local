@@ -14,9 +14,9 @@ class ProfileController {
   static async getMyProfile(req, res, next) {
     try {
       const userId = req.user.id;
-      
+
       const profile = await ProfileModel.getByUserId(userId);
-      
+
       if (!profile) {
         return res.status(404).json({
           success: false,
@@ -38,11 +38,12 @@ class ProfileController {
   // OBTENER PERFIL POR ID
   // ============================
   static async getProfileById(req, res, next) {
+    console.log('❌ Entrando a getProfileById con userId:', req.params.userId);
     try {
       const { userId } = req.params;
-      
+
       const profile = await ProfileModel.getByUserId(userId);
-      
+
       if (!profile) {
         return res.status(404).json({
           success: false,
@@ -108,7 +109,7 @@ class ProfileController {
   static async uploadProfilePicture(req, res, next) {
     try {
       const userId = req.user.id;
-      
+
       // Verificar que se haya subido un archivo
       if (!req.file) {
         return res.status(400).json({
@@ -120,7 +121,7 @@ class ProfileController {
       // Construir la URL de la imagen
       // En producción, esto sería una URL de S3 o Cloudinary
       const imageUrl = `/uploads/profiles/${req.file.filename}`;
-      
+
       // Actualizar en la base de datos
       const updatedProfile = await ProfileModel.updateProfilePicture(userId, imageUrl);
 
@@ -136,7 +137,7 @@ class ProfileController {
       logger.error('Error subiendo foto de perfil:', error);
       // Eliminar archivo si hay error
       if (req.file) {
-        await fs.unlink(req.file.path).catch(err => 
+        await fs.unlink(req.file.path).catch(err =>
           logger.error('Error eliminando archivo:', err)
         );
       }
@@ -150,19 +151,19 @@ class ProfileController {
   static async deleteProfilePicture(req, res, next) {
     try {
       const userId = req.user.id;
-      
+
       // Obtener perfil actual para obtener la URL de la imagen
       const currentProfile = await ProfileModel.getByUserId(userId);
-      
+
       if (currentProfile.profile_picture_url) {
         // Eliminar archivo físico
         const imagePath = path.join(
-          __dirname, 
+          __dirname,
           '../../public',
           currentProfile.profile_picture_url
         );
-        
-        await fs.unlink(imagePath).catch(err => 
+
+        await fs.unlink(imagePath).catch(err =>
           logger.error('Error eliminando archivo:', err)
         );
       }
@@ -187,7 +188,7 @@ class ProfileController {
   static async getGallery(req, res, next) {
     try {
       const { userId } = req.params;
-      
+
       const gallery = await ProfileModel.getGallery(userId);
 
       res.json({
@@ -203,7 +204,7 @@ class ProfileController {
   static async uploadGalleryPhoto(req, res, next) {
     try {
       const userId = req.user.id;
-      
+
       if (!req.file) {
         return res.status(400).json({
           success: false,
@@ -220,7 +221,7 @@ class ProfileController {
       }
 
       const imageUrl = `/uploads/gallery/${req.file.filename}`;
-      
+
       const photoData = {
         image_url: imageUrl,
         thumbnail_url: imageUrl, // En producción, generar thumbnail
@@ -237,7 +238,7 @@ class ProfileController {
     } catch (error) {
       logger.error('Error subiendo foto a galería:', error);
       if (req.file) {
-        await fs.unlink(req.file.path).catch(err => 
+        await fs.unlink(req.file.path).catch(err =>
           logger.error('Error eliminando archivo:', err)
         );
       }
@@ -249,7 +250,7 @@ class ProfileController {
     try {
       const userId = req.user.id;
       const { photoId } = req.params;
-      
+
       const deletedPhoto = await ProfileModel.deleteGalleryPhoto(photoId, userId);
 
       // Eliminar archivo físico
@@ -259,8 +260,8 @@ class ProfileController {
           '../../public',
           deletedPhoto.image_url
         );
-        
-        await fs.unlink(imagePath).catch(err => 
+
+        await fs.unlink(imagePath).catch(err =>
           logger.error('Error eliminando archivo:', err)
         );
       }
@@ -282,7 +283,7 @@ class ProfileController {
   static async getStats(req, res, next) {
     try {
       const { userId } = req.params;
-      
+
       const stats = await ProfileModel.getStats(userId);
 
       res.json({
@@ -343,6 +344,87 @@ class ProfileController {
       });
     } catch (error) {
       logger.error('Error actualizando teléfono:', error);
+      next(error);
+    }
+  }
+
+  // ============================
+  // OBTENER CATEGORÍAS DEL TRABAJADOR
+  // ============================
+  static async getWorkerCategories(req, res, next) {
+    console.log('✅ Entrando a getWorkerCategories');
+    try {
+      const userId = req.user.id;
+
+      const categories = await ProfileModel.getWorkerCategories(userId);
+
+      res.json({
+        success: true,
+        data: categories
+      });
+    } catch (error) {
+      logger.error('Error obteniendo categorías del trabajador:', error);
+      next(error);
+    }
+  }
+
+  // ============================
+  // ACTUALIZAR CATEGORÍAS DEL TRABAJADOR
+  // ============================
+  static async updateWorkerCategories(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const { categories } = req.body;
+
+      // Validar que sea trabajador
+      if (req.user.role !== 'worker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Solo los trabajadores pueden actualizar categorías'
+        });
+      }
+
+      // Validar formato de categorías
+      if (!Array.isArray(categories)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Las categorías deben ser un array'
+        });
+      }
+
+      // Validar que cada categoría tenga categoryId
+      for (const cat of categories) {
+        if (!cat.categoryId) {
+          return res.status(400).json({
+            success: false,
+            message: 'Cada categoría debe tener un categoryId'
+          });
+        }
+      }
+
+      // Validar que solo haya una categoría principal
+      const primaryCategories = categories.filter(cat => cat.isPrimary);
+      if (primaryCategories.length > 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'Solo puede haber una categoría principal'
+        });
+      }
+
+      await ProfileModel.updateWorkerCategories(userId, categories);
+
+      // Obtener categorías actualizadas
+      const updatedCategories = await ProfileModel.getWorkerCategories(userId);
+
+      res.json({
+        success: true,
+        message: 'Categorías actualizadas exitosamente',
+        data: updatedCategories
+      });
+
+      logger.info(`Categorías actualizadas para usuario ${userId}`);
+    } catch (error) {
+      logger.error('Error actualizando categorías:', error);
       next(error);
     }
   }

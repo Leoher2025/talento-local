@@ -11,18 +11,32 @@ class ProfileModel {
   static async getByUserId(userId) {
     try {
       const selectQuery = `
-        SELECT 
-          p.*,
-          u.email,
-          u.phone,
-          u.role,
-          u.verification_status,
-          u.is_active,
-          u.created_at as user_created_at
-        FROM profiles p
-        INNER JOIN users u ON p.user_id = u.id
-        WHERE p.user_id = $1
-      `;
+      SELECT 
+        p.*,
+        u.email,
+        u.phone,
+        u.role,
+        u.verification_status,
+        u.is_active,
+        u.created_at as user_created_at,
+        -- Estadísticas de reviews
+        COALESCE(
+          (SELECT COUNT(*) FROM reviews WHERE reviewee_id = u.id),
+          0
+        ) as total_reviews,
+        COALESCE(
+          (SELECT ROUND(AVG(rating)::numeric, 2) FROM reviews WHERE reviewee_id = u.id),
+          0
+        ) as avg_rating,
+        -- Contador de fotos de galería (NUEVO)
+        COALESCE(
+          (SELECT COUNT(*) FROM gallery_photos WHERE worker_id = u.id),
+          0
+        ) as gallery_photos_count
+      FROM profiles p
+      INNER JOIN users u ON p.user_id = u.id
+      WHERE p.user_id = $1
+    `;
 
       const result = await query(selectQuery, [userId]);
       return result.rows[0];
@@ -373,72 +387,72 @@ class ProfileModel {
   }
 
   // ============================
-// BUSCAR TRABAJADORES CON FILTROS
-// ============================
-static async searchWorkers(filters = {}) {
-  try {
-    const {
-      search,
-      categoryId,
-      city,
-      department,
-      minRating,
-      latitude,
-      longitude,
-      radiusKm = 50,
-      sortBy = 'rating_average',
-      sortOrder = 'DESC',
-      page = 1,
-      limit = 20
-    } = filters;
+  // BUSCAR TRABAJADORES CON FILTROS
+  // ============================
+  static async searchWorkers(filters = {}) {
+    try {
+      const {
+        search,
+        categoryId,
+        city,
+        department,
+        minRating,
+        latitude,
+        longitude,
+        radiusKm = 50,
+        sortBy = 'rating_average',
+        sortOrder = 'DESC',
+        page = 1,
+        limit = 20
+      } = filters;
 
-    let whereConditions = ["u.role = 'worker'", "u.is_active = true"];
-    let queryParams = [];
-    let paramIndex = 1;
-    let joins = `LEFT JOIN users u ON p.user_id = u.id`;
+      let whereConditions = ["u.role = 'worker'", "u.is_active = true"];
+      let queryParams = [];
+      let paramIndex = 1;
+      let joins = `LEFT JOIN users u ON p.user_id = u.id`;
 
-    // Filtro por categoría
-    if (categoryId) {
-      joins += ` INNER JOIN worker_categories wc ON u.id = wc.worker_id`;
-      whereConditions.push(`wc.category_id = $${paramIndex}`);
-      queryParams.push(categoryId);
-      paramIndex++;
-    }
+      // Filtro por categoría
+      if (categoryId) {
+        joins += ` INNER JOIN worker_categories wc ON u.id = wc.worker_id`;
+        whereConditions.push(`wc.category_id = $${paramIndex}`);
+        queryParams.push(categoryId);
+        paramIndex++;
+      }
 
-    // Búsqueda de texto
-    if (search && search.trim()) {
-      whereConditions.push(
-        `(p.first_name ILIKE $${paramIndex} OR p.last_name ILIKE $${paramIndex} OR p.skills ILIKE $${paramIndex} OR p.bio ILIKE $${paramIndex})`
-      );
-      queryParams.push(`%${search.trim()}%`);
-      paramIndex++;
-    }
+      // Búsqueda de texto
+      if (search && search.trim()) {
+        whereConditions.push(
+          `(p.first_name ILIKE $${paramIndex} OR p.last_name ILIKE $${paramIndex} OR p.skills ILIKE $${paramIndex} OR p.bio ILIKE $${paramIndex})`
+        );
+        queryParams.push(`%${search.trim()}%`);
+        paramIndex++;
+      }
 
-    // Filtro por ciudad
-    if (city) {
-      whereConditions.push(`p.city ILIKE $${paramIndex}`);
-      queryParams.push(`%${city}%`);
-      paramIndex++;
-    }
+      // Filtro por ciudad
+      if (city) {
+        whereConditions.push(`p.city ILIKE $${paramIndex}`);
+        queryParams.push(`%${city}%`);
+        paramIndex++;
+      }
 
-    // Filtro por departamento
-    if (department) {
-      whereConditions.push(`p.department ILIKE $${paramIndex}`);
-      queryParams.push(`%${department}%`);
-      paramIndex++;
-    }
+      // Filtro por departamento
+      if (department) {
+        whereConditions.push(`p.department ILIKE $${paramIndex}`);
+        queryParams.push(`%${department}%`);
+        paramIndex++;
+      }
 
-    // Filtro por rating mínimo
-    if (minRating) {
-      whereConditions.push(`p.rating_average >= $${paramIndex}`);
-      queryParams.push(minRating);
-      paramIndex++;
-    }
+      // Filtro por rating mínimo
+      if (minRating) {
+        whereConditions.push(`p.rating_average >= $${paramIndex}`);
+        queryParams.push(minRating);
+        paramIndex++;
+      }
 
-    // Agregar cálculo de distancia si hay coordenadas
-    let distanceSelect = '';
-    if (latitude && longitude) {
-      distanceSelect = `,
+      // Agregar cálculo de distancia si hay coordenadas
+      let distanceSelect = '';
+      if (latitude && longitude) {
+        distanceSelect = `,
         (
           6371 * acos(
             cos(radians($${paramIndex})) * 
@@ -449,11 +463,11 @@ static async searchWorkers(filters = {}) {
           )
         ) as distance_km
       `;
-      queryParams.push(latitude, longitude);
-      paramIndex += 2;
+        queryParams.push(latitude, longitude);
+        paramIndex += 2;
 
-      if (radiusKm) {
-        whereConditions.push(`
+        if (radiusKm) {
+          whereConditions.push(`
           (
             6371 * acos(
               cos(radians($${paramIndex - 2})) * 
@@ -464,34 +478,34 @@ static async searchWorkers(filters = {}) {
             )
           ) <= ${radiusKm}
         `);
+        }
       }
-    }
 
-    // Ordenamiento
-    const validSortFields = {
-      'rating_average': 'p.rating_average',
-      'completed_jobs': 'completed_jobs',
-      'created_at': 'p.created_at',
-      'distance': 'distance_km'
-    };
+      // Ordenamiento
+      const validSortFields = {
+        'rating_average': 'p.rating_average',
+        'completed_jobs': 'completed_jobs',
+        'created_at': 'p.created_at',
+        'distance': 'distance_km'
+      };
 
-    let orderByClause = 'p.rating_average DESC';
-    
-    if (validSortFields[sortBy]) {
-      const sortField = validSortFields[sortBy];
-      const order = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-      orderByClause = `${sortField} ${order}`;
-      
-      if (sortBy === 'distance' && (!latitude || !longitude)) {
-        orderByClause = 'p.rating_average DESC';
+      let orderByClause = 'p.rating_average DESC';
+
+      if (validSortFields[sortBy]) {
+        const sortField = validSortFields[sortBy];
+        const order = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+        orderByClause = `${sortField} ${order}`;
+
+        if (sortBy === 'distance' && (!latitude || !longitude)) {
+          orderByClause = 'p.rating_average DESC';
+        }
       }
-    }
 
-    // Paginación
-    const offset = (page - 1) * limit;
+      // Paginación
+      const offset = (page - 1) * limit;
 
-    // Query principal (con categorías)
-    const mainQuery = `
+      // Query principal (con categorías)
+      const mainQuery = `
       SELECT DISTINCT ON (p.user_id)
         p.*,
         u.email,
@@ -515,26 +529,26 @@ static async searchWorkers(filters = {}) {
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
 
-    queryParams.push(limit, offset);
+      queryParams.push(limit, offset);
 
-    // ✅ Query de conteo (SIN columnas JSON, solo contar)
-    const countQuery = `
+      // ✅ Query de conteo (SIN columnas JSON, solo contar)
+      const countQuery = `
       SELECT COUNT(DISTINCT p.user_id) as total
       FROM profiles p
       ${joins}
       WHERE ${whereConditions.join(' AND ')}
     `;
 
-    const [workersResult, countResult] = await Promise.all([
-      query(mainQuery, queryParams),
-      query(countQuery, queryParams.slice(0, -2))
-    ]);
+      const [workersResult, countResult] = await Promise.all([
+        query(mainQuery, queryParams),
+        query(countQuery, queryParams.slice(0, -2))
+      ]);
 
-    // ✅ Obtener categorías por separado para cada trabajador
-    const workersWithCategories = await Promise.all(
-      workersResult.rows.map(async (worker) => {
-        const categoriesResult = await query(
-          `SELECT 
+      // ✅ Obtener categorías por separado para cada trabajador
+      const workersWithCategories = await Promise.all(
+        workersResult.rows.map(async (worker) => {
+          const categoriesResult = await query(
+            `SELECT 
             wc.category_id,
             c.name as category_name,
             c.icon as category_icon,
@@ -544,33 +558,33 @@ static async searchWorkers(filters = {}) {
            INNER JOIN categories c ON wc.category_id = c.id
            WHERE wc.worker_id = $1
            ORDER BY wc.is_primary DESC, wc.created_at ASC`,
-          [worker.user_id]
-        );
+            [worker.user_id]
+          );
 
-        return {
-          ...worker,
-          categories: categoriesResult.rows
-        };
-      })
-    );
+          return {
+            ...worker,
+            categories: categoriesResult.rows
+          };
+        })
+      );
 
-    const total = parseInt(countResult.rows[0].total);
-    const totalPages = Math.ceil(total / limit);
+      const total = parseInt(countResult.rows[0].total);
+      const totalPages = Math.ceil(total / limit);
 
-    return {
-      workers: workersWithCategories,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages
-      }
-    };
-  } catch (error) {
-    logger.error('Error buscando trabajadores:', error);
-    throw error;
+      return {
+        workers: workersWithCategories,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages
+        }
+      };
+    } catch (error) {
+      logger.error('Error buscando trabajadores:', error);
+      throw error;
+    }
   }
-}
   // ============================
   // OBTENER CATEGORÍAS DEL TRABAJADOR
   // ============================

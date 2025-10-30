@@ -11,11 +11,14 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Image,
+  Modal,
+  Dimensions
 } from 'react-native';
 import { COLORS, FONT_SIZES, SPACING, RADIUS, STATIC_URL } from '../../utils/constants';
 import workerService from '../../services/workerService';
 import reviewService from '../../services/reviewService';
 import Toast from 'react-native-toast-message';
+import galleryService from '../../services/galleryService';
 
 export default function WorkerProfileScreen({ route, navigation }) {
   const { workerId } = route.params;
@@ -23,6 +26,11 @@ export default function WorkerProfileScreen({ route, navigation }) {
   const [worker, setWorker] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [gallery, setGallery] = useState([]);
+  const [isLoadingGallery, setIsLoadingGallery] = useState(true);
+  const [selectedGalleryPhoto, setSelectedGalleryPhoto] = useState(null);
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
+  const [showAllGallery, setShowAllGallery] = useState(false);
 
   useEffect(() => {
     loadWorkerProfile();
@@ -57,6 +65,24 @@ export default function WorkerProfileScreen({ route, navigation }) {
       suggestedWorkerId: workerId,
       workerName: `${worker.first_name} ${worker.last_name}`
     });
+  };
+
+  useEffect(() => {
+    if (workerId) {
+      loadGallery();
+    }
+  }, [workerId]);
+
+  const loadGallery = async () => {
+    try {
+      setIsLoadingGallery(true);
+      const data = await galleryService.getWorkerGallery(workerId);
+      setGallery(data);
+    } catch (error) {
+      console.error('Error cargando galería:', error);
+    } finally {
+      setIsLoadingGallery(false);
+    }
   };
 
   if (isLoading) {
@@ -222,6 +248,62 @@ export default function WorkerProfileScreen({ route, navigation }) {
           </View>
         )}
 
+        {/* Galería de Trabajos */}
+        {gallery.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📸 Trabajos Realizados</Text>
+
+            {isLoadingGallery ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.galleryScroll}
+              >
+                {gallery.slice(0, 6).map((photo) => (
+                  <TouchableOpacity
+                    key={photo.id}
+                    style={styles.galleryItem}
+                    onPress={() => {
+                      setSelectedGalleryPhoto(photo);
+                      setShowGalleryModal(true);
+                    }}
+                  >
+                    <Image
+                      source={{ uri: photo.photo_url }}
+                      style={styles.galleryImage}
+                    />
+                    {photo.is_featured && (
+                      <View style={styles.featuredBadge}>
+                        <Text style={styles.featuredText}>⭐</Text>
+                      </View>
+                    )}
+                    {photo.category_name && (
+                      <View style={styles.galleryCategory}>
+                        <Text style={styles.galleryCategoryText}>
+                          {photo.category_icon} {photo.category_name}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+
+                {gallery.length > 6 && (
+                  <TouchableOpacity
+                    style={styles.seeMoreGallery}
+                    onPress={() => setShowAllGallery(true)}
+                  >
+                    <Text style={styles.seeMoreText}>
+                      Ver todas{'\n'}({gallery.length})
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+            )}
+          </View>
+        )}
+
         {/* Reseñas */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -276,6 +358,90 @@ export default function WorkerProfileScreen({ route, navigation }) {
           <Text style={styles.contactButtonText}>Contactar y Crear Trabajo</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Modal para ver foto en grande */}
+      <Modal
+        visible={showGalleryModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowGalleryModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalClose}
+            onPress={() => setShowGalleryModal(false)}
+          >
+            <Text style={styles.modalCloseText}>✕</Text>
+          </TouchableOpacity>
+
+          {selectedGalleryPhoto && (
+            <View style={styles.modalContent}>
+              <Image
+                source={{ uri: selectedGalleryPhoto.photo_url }}
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
+
+              {selectedGalleryPhoto.description && (
+                <View style={styles.modalDescription}>
+                  <Text style={styles.modalDescriptionText}>
+                    {selectedGalleryPhoto.description}
+                  </Text>
+                </View>
+              )}
+
+              {selectedGalleryPhoto.category_name && (
+                <View style={styles.modalCategory}>
+                  <Text style={styles.modalCategoryText}>
+                    {selectedGalleryPhoto.category_icon} {selectedGalleryPhoto.category_name}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+      </Modal>
+
+      {/* Modal para ver toda la galería */}
+      <Modal
+        visible={showAllGallery}
+        animationType="slide"
+        onRequestClose={() => setShowAllGallery(false)}
+      >
+        <SafeAreaView style={styles.fullGalleryContainer}>
+          <View style={styles.fullGalleryHeader}>
+            <TouchableOpacity onPress={() => setShowAllGallery(false)}>
+              <Text style={styles.backButton}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.fullGalleryTitle}>Trabajos Realizados</Text>
+            <View style={{ width: 30 }} />
+          </View>
+
+          <ScrollView contentContainerStyle={styles.fullGalleryGrid}>
+            {gallery.map((photo) => (
+              <TouchableOpacity
+                key={photo.id}
+                style={styles.fullGalleryItem}
+                onPress={() => {
+                  setSelectedGalleryPhoto(photo);
+                  setShowAllGallery(false);
+                  setShowGalleryModal(true);
+                }}
+              >
+                <Image
+                  source={{ uri: photo.photo_url }}
+                  style={styles.fullGalleryImage}
+                />
+                {photo.is_featured && (
+                  <View style={styles.featuredBadge}>
+                    <Text style={styles.featuredText}>⭐</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -631,5 +797,219 @@ const styles = StyleSheet.create({
   categoryExperience: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
+  },
+
+  galleryScroll: {
+    paddingVertical: SPACING.sm,
+  },
+  galleryItem: {
+    width: 120,
+    height: 120,
+    marginRight: SPACING.sm,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  featuredBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: COLORS.warning + 'DD',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  featuredText: {
+    fontSize: FONT_SIZES.xs,
+  },
+  galleryCategory: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 4,
+  },
+  galleryCategoryText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  seeMoreGallery: {
+    width: 120,
+    height: 120,
+    backgroundColor: COLORS.gray[200],
+    borderRadius: RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  seeMoreText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  // Estilos de galería
+  galleryScroll: {
+    paddingVertical: SPACING.sm,
+  },
+  galleryItem: {
+    width: 120,
+    height: 120,
+    marginRight: SPACING.sm,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: COLORS.gray[200],
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  featuredBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: COLORS.warning + 'DD',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  featuredText: {
+    fontSize: FONT_SIZES.xs,
+  },
+  galleryCategory: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 4,
+  },
+  galleryCategoryText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  seeMoreGallery: {
+    width: 120,
+    height: 120,
+    backgroundColor: COLORS.gray[200],
+    borderRadius: RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    borderStyle: 'dashed',
+  },
+  seeMoreText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
+  // Estilos de modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCloseText: {
+    fontSize: FONT_SIZES['2xl'],
+    color: COLORS.white,
+    fontWeight: '300',
+  },
+  modalContent: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalImage: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height * 0.7,
+  },
+  modalDescription: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: SPACING.md,
+    margin: SPACING.md,
+    borderRadius: RADIUS.md,
+    maxWidth: '90%',
+  },
+  modalDescriptionText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZES.base,
+    textAlign: 'center',
+  },
+  modalCategory: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full,
+  },
+  modalCategoryText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+  },
+
+  // Estilos de galería completa
+  fullGalleryContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  fullGalleryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray[200],
+  },
+  fullGalleryTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+  },
+  fullGalleryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  fullGalleryItem: {
+    width: '48%',
+    height: 150,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+    backgroundColor: COLORS.gray[200],
+    position: 'relative',
+  },
+  fullGalleryImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
 });

@@ -5,7 +5,7 @@ import { API_URL } from '../utils/constants';
 
 class ChatService {
   constructor() {
-    this.baseURL = API_URL || 'http://192.168.101.12:5000/api';
+    this.baseURL = API_URL || 'http://192.168.101.3:5000/api';
   }
 
   // Método genérico para hacer peticiones (igual que jobService y applicationService)

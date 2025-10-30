@@ -46,6 +46,9 @@ import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 import WorkersSearchScreen from '../screens/workers/WorkersSearchScreen';
 import WorkerProfileScreen from '../screens/workers/WorkerProfileScreen';
 
+// Pantalla de Galeria
+import MyGalleryScreen from '../screens/gallery/MyGalleryScreen';
+
 const Stack = createNativeStackNavigator();
 
 // Stack de autenticación (usuarios no logueados)
@@ -268,6 +271,15 @@ const MainStack = () => {
         component={WorkerProfileScreen}
         options={{
           title: 'Perfil del Trabajador',
+          headerShown: false
+        }}
+      />
+      {/* Galeria */}
+      <Stack.Screen
+        name="MyGallery"
+        component={MyGalleryScreen}
+        options={{
+          title: 'Mi Galería',
           headerShown: false
         }}
       />

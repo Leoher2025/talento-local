@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
@@ -22,6 +23,7 @@ import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES, API_URL, STATIC_URL } 
 import Toast from 'react-native-toast-message';
 import userService from '../../services/userService';
 import CategorySelector from '../../components/CategorySelector';
+import galleryService from '../../services/galleryService';
 
 export default function EditProfileScreen({ navigation }) {
 
@@ -30,6 +32,7 @@ export default function EditProfileScreen({ navigation }) {
   const [showCategorySelector, setShowCategorySelector] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [galleryCount, setGalleryCount] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
@@ -52,8 +55,17 @@ export default function EditProfileScreen({ navigation }) {
     loadProfile();
     if (user?.role === 'worker') {
       loadWorkerCategories();
+      loadGalleryCount();
     }
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.role === 'worker') {
+        loadGalleryCount(); // Recargar contador cada vez que vuelves a esta pantalla
+      }
+    }, [user?.role])
+  );
 
   const loadWorkerCategories = async () => {
     try {
@@ -61,6 +73,15 @@ export default function EditProfileScreen({ navigation }) {
       setSelectedCategories(categories);
     } catch (error) {
       console.error('Error cargando categorías:', error);
+    }
+  };
+
+  const loadGalleryCount = async () => {
+    try {
+      const photos = await galleryService.getMyGallery();
+      setGalleryCount(photos.length);
+    } catch (error) {
+      console.error('Error cargando contador de galería:', error);
     }
   };
 
@@ -362,6 +383,22 @@ export default function EditProfileScreen({ navigation }) {
             <Text style={styles.photoHint}>Toca para cambiar foto</Text>
             {isSaving && <Text style={styles.savingText}>Guardando...</Text>}
           </View>
+
+          {user?.role === 'worker' && (
+            <TouchableOpacity
+              style={styles.galleryButton}
+              onPress={() => navigation.navigate('MyGallery')}
+            >
+              <Text style={styles.galleryIcon}>📸</Text>
+              <View style={styles.galleryInfo}>
+                <Text style={styles.galleryTitle}>Mi Galería de Trabajos</Text>
+                <Text style={styles.gallerySubtitle}>
+                  {galleryCount} {galleryCount === 1 ? 'foto' : 'fotos'}
+                </Text>
+              </View>
+              <Text style={styles.galleryArrow}>→</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Formulario */}
           <View style={styles.form}>
@@ -761,6 +798,43 @@ const styles = StyleSheet.create({
   },
 
   categorySelectorArrow: {
+    fontSize: FONT_SIZES.xl,
+    color: COLORS.text.secondary,
+  },
+
+  // En los StyleSheet.create:
+
+  galleryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  galleryIcon: {
+    fontSize: FONT_SIZES['2xl'],
+    marginRight: SPACING.md,
+  },
+  galleryInfo: {
+    flex: 1,
+  },
+  galleryTitle: {
+    fontSize: FONT_SIZES.base,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+    marginBottom: 2,
+  },
+  gallerySubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
+  },
+  galleryArrow: {
     fontSize: FONT_SIZES.xl,
     color: COLORS.text.secondary,
   },

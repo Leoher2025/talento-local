@@ -132,7 +132,7 @@ class ProfileController {
 
       const fullUrl = photoUrl.startsWith('http')
         ? photoUrl
-        : `${process.env.API_URL || 'http://192.168.101.7:5000'}${photoUrl}`;
+        : `${process.env.API_URL || 'http://192.168.101.3:5000'}${photoUrl}`;
 
       res.json({
         success: true,

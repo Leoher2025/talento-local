@@ -16,6 +16,7 @@ const notificationRoutes = require('./routes/notification.routes');
 const workerRoutes = require('./routes/worker.routes');
 const galleryRoutes = require('./routes/gallery.routes');
 const verificationRoutes = require('./routes/verification.routes');
+const locationRoutes = require('./routes/location.routes');
 
 // Crear aplicación Express
 const app = express();
@@ -88,6 +89,9 @@ app.use('/api/notifications', notificationRoutes);
 
 // Registrar rutas de verificación
 app.use('/api/verification', verificationRoutes);
+
+// Registrar rutas de geolocalización
+app.use('/api/location', locationRoutes);
 
 // Registrar rutas de galería
 app.use('/api/gallery', galleryRoutes);

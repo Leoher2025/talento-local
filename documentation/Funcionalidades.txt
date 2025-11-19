@@ -67,13 +67,13 @@
 ✅ Infinite scroll
 
 
-⏳ FUNCIONALIDADES PENDIENTES
+✅ FUNCIONALIDADES PENDIENTES
 🔔 Notificaciones Push
 
-⏳ Configuración de Firebase/Expo Notifications
-⏳ Notificaciones de nuevos mensajes
-⏳ Notificaciones de aplicaciones
-⏳ Notificaciones de cambios en trabajos
+✅ Configuración de Firebase/Expo Notifications
+✅ Notificaciones de nuevos mensajes
+✅ Notificaciones de aplicaciones
+✅ Notificaciones de cambios en trabajos
 
 ⭐ Sistema de Calificaciones y Reviews
 
@@ -91,22 +91,22 @@
 
 📍 Geolocalización Avanzada
 
-⏳ Mapa interactivo de trabajos cercanos
-⏳ Filtro por radio de distancia
-⏳ Navegación GPS a ubicación del trabajo
-⏳ Tracking en tiempo real (opcional)
+✅ Mapa interactivo de trabajos cercanos
+✅ Filtro por radio de distancia
+✅ Navegación GPS a ubicación del trabajo
+✅ Tracking en tiempo real (opcional)
 
 📸 Galería de Trabajos
 
-⏳ Galería de trabajos completados (trabajadores)
-⏳ Subir múltiples fotos
-⏳ Portfolio visual
+✅ Galería de trabajos completados (trabajadores)
+✅ Subir múltiples fotos
+✅ Portfolio visual
 
 🔍 Búsqueda Avanzada
 
-⏳ Búsqueda por trabajador específico
-⏳ Filtros combinados (precio + ubicación + calificación)
-⏳ Ordenamiento (precio, distancia, calificación)
+✅ Búsqueda por trabajador específico
+✅ Filtros combinados (precio + ubicación + calificación)
+✅ Ordenamiento (precio, distancia, calificación)
 ⏳ Guardado de búsquedas favoritas
 
 ❤️ Favoritos

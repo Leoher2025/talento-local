@@ -57,7 +57,7 @@ class GalleryController {
         message: 'Foto subida exitosamente',
         data: {
           ...photo,
-          photo_url: `${process.env.API_URL || 'http://192.168.101.7:5000'}${photoUrl}` // ✅ URL completa para el frontend
+          photo_url: `${process.env.API_URL || 'http://192.168.101.3:5000'}${photoUrl}` // ✅ URL completa para el frontend
         }
       });
     } catch (error) {

@@ -650,6 +650,108 @@ class ProfileModel {
       throw error;
     }
   }
+
+  // Al final de la clase ProfileModel, ANTES de module.exports
+
+  // ============================
+  // ACTUALIZAR UBICACIÓN CON COORDENADAS
+  // ============================
+  static async updateLocation(userId, locationData) {
+    try {
+      const { city, department, latitude, longitude } = locationData;
+
+      const updateQuery = `
+      UPDATE profiles
+      SET 
+        city = $1,
+        department = $2,
+        latitude = $3,
+        longitude = $4,
+        location_updated_at = NOW()
+      WHERE user_id = $5
+      RETURNING *
+    `;
+
+      const result = await query(updateQuery, [
+        city,
+        department,
+        latitude,
+        longitude,
+        userId
+      ]);
+
+      return result.rows[0];
+    } catch (error) {
+      logger.error('Error actualizando ubicación:', error);
+      throw error;
+    }
+  }
+
+  // ============================
+  // BUSCAR TRABAJADORES CERCANOS
+  // ============================
+  static async getNearbyWorkers({ latitude, longitude, radius = 10, categoryId = null, minRating = null, limit = 50 }) {
+    try {
+      let queryText = `
+      SELECT 
+        p.*,
+        u.email,
+        u.phone,
+        u.role,
+        u.verification_status,
+        u.phone_verified,
+        u.profile_picture_verified,
+        calculate_distance($1, $2, p.latitude, p.longitude) as distance_km,
+        COALESCE(AVG(r.rating), 0) as average_rating,
+        COUNT(DISTINCT r.id) as total_reviews
+      FROM profiles p
+      INNER JOIN users u ON p.user_id = u.id
+      LEFT JOIN reviews r ON p.user_id = r.reviewee_id
+      WHERE 
+        u.role = 'worker'
+        AND u.is_active = true
+        AND p.latitude IS NOT NULL
+        AND p.longitude IS NOT NULL
+        AND calculate_distance($1, $2, p.latitude, p.longitude) <= $3
+    `;
+
+      const params = [latitude, longitude, radius];
+      let paramIndex = 4;
+
+      // Filtro por categoría
+      if (categoryId) {
+        queryText += ` AND $${paramIndex} = ANY(p.skills)`;
+        params.push(categoryId);
+        paramIndex++;
+      }
+
+      queryText += `
+      GROUP BY p.id,p.user_id, p.first_name, p.last_name, p.bio, p.profile_picture_url, 
+               p.city, p.department, p.latitude, p.longitude,
+              p.created_at, p.updated_at,
+               u.email, u.phone, u.role, u.verification_status, u.phone_verified, u.profile_picture_verified
+    `;
+
+      // Filtro por calificación mínima
+      if (minRating) {
+        queryText += ` HAVING COALESCE(AVG(r.rating), 0) >= $${paramIndex}`;
+        params.push(minRating);
+        paramIndex++;
+      }
+
+      queryText += `
+      ORDER BY distance_km ASC
+      LIMIT $${paramIndex}
+    `;
+      params.push(limit);
+
+      const result = await query(queryText, params);
+      return result.rows;
+    } catch (error) {
+      logger.error('Error buscando trabajadores cercanos:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = ProfileModel;

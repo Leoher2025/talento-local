@@ -20,11 +20,21 @@
           "color": "#ffffff",
           "sounds": ["./assets/notification-sound.wav"]
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Talento Local necesita acceso a tu ubicación para mostrarte trabajadores cercanos."
+        }
       ]
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.app.talento.local"
+      "bundleIdentifier": "com.app.talento.local",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Talento Local necesita tu ubicación para mostrarte trabajadores cercanos.",
+        "NSLocationAlwaysUsageDescription": "Talento Local necesita tu ubicación para mostrarte trabajadores cercanos."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -35,7 +45,9 @@
       "package": "com.app.talento.local",
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "VIBRATE",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
       ]
     },
     "web": {

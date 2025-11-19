@@ -36,6 +36,8 @@ export default function EditProfileScreen({ navigation }) {
   const [isSaving, setIsSaving] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [coordinates, setCoordinates] = useState(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -279,6 +281,10 @@ export default function EditProfileScreen({ navigation }) {
         city: formData.city.trim(),
         department: formData.state.trim(),
         address: formData.address.trim(),
+        ...(coordinates && {
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude
+        })
       };
 
       // Agregar campos de trabajador si aplica
@@ -311,6 +317,38 @@ export default function EditProfileScreen({ navigation }) {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // obtener ubicación:
+  const handleGetCurrentLocation = async () => {
+    try {
+      setIsGettingLocation(true);
+
+      const locationService = require('../../services/locationService').default;
+      const location = await locationService.getCurrentLocation();
+
+      if (location) {
+        setCoordinates({
+          latitude: location.latitude,
+          longitude: location.longitude
+        });
+
+        Toast.show({
+          type: 'success',
+          text1: 'Ubicación obtenida',
+          text2: 'Se guardará al actualizar el perfil'
+        });
+      }
+    } catch (error) {
+      console.error('Error obteniendo ubicación:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudo obtener la ubicación'
+      });
+    } finally {
+      setIsGettingLocation(false);
     }
   };
 
@@ -523,20 +561,70 @@ export default function EditProfileScreen({ navigation }) {
             )}
 
             {/* Ubicación */}
-            <Text style={styles.sectionTitle}>Ubicación</Text>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Ubicación</Text>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Ciudad</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.city}
-                onChangeText={(text) => updateFormField('city', text)}
-                placeholder="Tu ciudad"
-                placeholderTextColor={COLORS.text.secondary}
-              />
+              <View style={styles.locationHeader}>
+                <Text style={styles.label}>Ciudad y Departamento</Text>
+                <TouchableOpacity
+                  style={styles.getLocationButton}
+                  onPress={handleGetCurrentLocation}
+                  disabled={isGettingLocation}
+                >
+                  {isGettingLocation ? (
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  ) : (
+                    <Text style={styles.getLocationButtonText}>📍 Usar mi ubicación</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Ciudad</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ciudad"
+                  placeholderTextColor={COLORS.text.secondary}
+                  value={formData.city}
+                  onChangeText={(value) => updateFormField('city', value)}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Departamento</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Departamento"
+                  placeholderTextColor={COLORS.text.secondary}
+                  value={formData.state}
+                  onChangeText={(value) => updateFormField('state', value)}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Dirección</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={formData.address}
+                  onChangeText={(text) => updateFormField('address', text)}
+                  placeholder="Tu dirección completa"
+                  placeholderTextColor={COLORS.text.secondary}
+                  multiline
+                  numberOfLines={2}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              {coordinates && (
+                <View style={styles.coordinatesInfo}>
+                  <Text style={styles.coordinatesText}>
+                    ✓ Ubicación GPS guardada
+                  </Text>
+                </View>
+              )}
             </View>
 
-            <View style={styles.inputGroup}>
+           {/*} <View style={styles.inputGroup}>
               <Text style={styles.label}>Departamento</Text>
               <TextInput
                 style={styles.input}
@@ -559,7 +647,7 @@ export default function EditProfileScreen({ navigation }) {
                 numberOfLines={2}
                 textAlignVertical="top"
               />
-            </View>
+            </View>*/}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -837,5 +925,44 @@ const styles = StyleSheet.create({
   galleryArrow: {
     fontSize: FONT_SIZES.xl,
     color: COLORS.text.secondary,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  getLocationButton: {
+    backgroundColor: COLORS.primary + '20',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.md,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  getLocationButtonText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  coordinatesInfo: {
+    backgroundColor: COLORS.success + '10',
+    padding: SPACING.sm,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.sm,
+  },
+  coordinatesText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.success,
+    fontWeight: '500',
+  },
+  section: {
+    marginBottom: SPACING.lg,
+  },
+
+  sectionSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING.md,
   },
 });

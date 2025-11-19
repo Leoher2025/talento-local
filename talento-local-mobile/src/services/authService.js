@@ -8,7 +8,7 @@ class AuthService {
     // Para desarrollo local con dispositivo físico, usa tu IP local
     // Para emulador Android: 10.0.2.2
     // Para emulador iOS: localhost
-    this.baseURL = API_URL || 'http://192.168.101.10:5000/api'; // Cambia a tu IP local
+    this.baseURL = API_URL || 'http://192.168.101.3:5000/api'; // Cambia a tu IP local
   }
 
   // Método genérico para hacer peticiones

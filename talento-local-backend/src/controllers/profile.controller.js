@@ -110,37 +110,45 @@ class ProfileController {
     try {
       const userId = req.user.id;
 
-      // Verificar que se haya subido un archivo
       if (!req.file) {
         return res.status(400).json({
           success: false,
-          message: 'No se proporcionó ninguna imagen'
+          message: 'No se ha subido ninguna imagen'
         });
       }
 
-      // Construir la URL de la imagen
-      // En producción, esto sería una URL de S3 o Cloudinary
-      const imageUrl = `/uploads/profiles/${req.file.filename}`;
+      // Construir URL relativa
+      const photoUrl = `/uploads/profiles/${req.file.filename}`;
 
-      // Actualizar en la base de datos
-      const updatedProfile = await ProfileModel.updateProfilePicture(userId, imageUrl);
+      // Actualizar en la tabla profiles
+      const ProfileModel = require('../models/profile.model');
+      const updatedProfile = await ProfileModel.updateProfilePicture(userId, photoUrl);
+
+      // ✅ MARCAR como verificada automáticamente
+      const VerificationModel = require('../models/verification.model');
+      await VerificationModel.markProfilePictureVerified(userId);
+
+      logger.info(`Foto de perfil actualizada para usuario ${userId}`);
+
+      const fullUrl = photoUrl.startsWith('http')
+        ? photoUrl
+        : `${process.env.API_URL || 'http://192.168.101.7:5000'}${photoUrl}`;
 
       res.json({
         success: true,
         message: 'Foto de perfil actualizada',
         data: {
-          url: imageUrl,
-          profile: updatedProfile
+          url: photoUrl,
+          fullUrl: fullUrl
         }
       });
     } catch (error) {
-      logger.error('Error subiendo foto de perfil:', error);
-      // Eliminar archivo si hay error
-      if (req.file) {
-        await fs.unlink(req.file.path).catch(err =>
-          logger.error('Error eliminando archivo:', err)
-        );
+      // Si hay error, eliminar el archivo subido
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
       }
+
+      logger.error('Error subiendo foto de perfil:', error);
       next(error);
     }
   }

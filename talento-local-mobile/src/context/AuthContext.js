@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import authService from '../services/authService';
 import notificationService from '../services/notificationService';
+import { API_URL } from '../utils/constants';
 
 // Crear el contexto
 const AuthContext = createContext({});
@@ -23,6 +24,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [verificationStatus, setVerificationStatus] = useState(null);
 
   // Verificar si hay una sesión guardada al iniciar la app
   useEffect(() => {
@@ -69,6 +71,18 @@ export const AuthProvider = ({ children }) => {
       }
     };
   }, [user]);
+
+  const loadVerificationStatus = async () => {
+    try {
+      const verificationService = require('../services/verificationService').default;
+      const status = await verificationService.getStatus();
+      setVerificationStatus(status);
+      return status;
+    } catch (error) {
+      console.error('Error cargando estado de verificación:', error);
+      return null;
+    }
+  };
 
   // Manejar navegación desde notificación
   const handleNotificationNavigation = (notification) => {
@@ -166,6 +180,9 @@ export const AuthProvider = ({ children }) => {
         // Guardar en almacenamiento local
         await AsyncStorage.setItem('userData', JSON.stringify(userData));
 
+        //Cargar estado de verificación
+        await loadVerificationStatus();
+
         // Registrar token de notificaciones
         await notificationService.registerToken();
 
@@ -228,6 +245,9 @@ export const AuthProvider = ({ children }) => {
         setUser(userDataFormatted);
         setIsAuthenticated(true);
 
+        // Cargar estado de verificación
+        await loadVerificationStatus();
+
         Toast.show({
           type: 'success',
           text1: '¡Cuenta creada!',
@@ -278,6 +298,7 @@ export const AuthProvider = ({ children }) => {
 
       setUser(null);
       setIsAuthenticated(false);
+      setVerificationStatus(null);
 
       Toast.show({
         type: 'info',
@@ -314,32 +335,49 @@ export const AuthProvider = ({ children }) => {
   // Recargar datos del usuario desde el servidor
   const refreshUserData = async () => {
     try {
-      console.log('🔄 refreshUserData: Iniciando...');
-      const response = await authService.getProfile();
-      console.log('📥 refreshUserData: Respuesta:', JSON.stringify(response, null, 2));
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        logout();
+        return;
+      }
 
-      if (response.success) {
+      const response = await fetch(`${API_URL}/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Reestructurar datos igual que en login
         const userData = {
-          ...user,
-          ...response.data.user,
-          profile: response.data.profile,
-          // ✅ Asegurarse de que profile_picture_url esté en el nivel superior
-          profile_picture_url: response.data.profile?.profile_picture_url || response.data.user?.profile_picture_url,
-          first_name: response.data.profile?.first_name || response.data.user?.first_name,
-          last_name: response.data.profile?.last_name || response.data.user?.last_name,
+          id: data.data.id,
+          email: data.data.email,
+          phone: data.data.phone,
+          role: data.data.role,
+          verificationStatus: data.data.verification_status,
+          first_name: data.data.profile?.first_name || '',
+          last_name: data.data.profile?.last_name || '',
+          profile_picture_url: data.data.profile?.profile_picture_url || null,
+          profile: data.data.profile
         };
 
-        console.log('💾 refreshUserData: Guardando userData:', JSON.stringify(userData, null, 2));
         setUser(userData);
         await AsyncStorage.setItem('userData', JSON.stringify(userData));
 
-        return true;
+        // ✅ Cargar estado de verificación
+        if (data.data.verification) {
+          setVerificationStatus(data.data.verification);
+        } else {
+          await loadVerificationStatus();
+        }
+      } else {
+        logout();
       }
-
-      return false;
     } catch (error) {
-      console.error('❌ refreshUserData error:', error);
-      return false;
+      console.error('Error refrescando datos:', error);
+      logout();
     }
   };
 
@@ -349,6 +387,7 @@ export const AuthProvider = ({ children }) => {
     user,
     isLoading,
     isAuthenticated,
+    verificationStatus,
 
     // Funciones
     login,
@@ -357,6 +396,7 @@ export const AuthProvider = ({ children }) => {
     updateUser,
     refreshUserData,
     checkAuthState,
+    loadVerificationStatus,
     unreadNotifications,
     updateUnreadCount,
   };

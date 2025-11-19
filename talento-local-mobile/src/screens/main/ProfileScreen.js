@@ -15,9 +15,10 @@ import { COLORS, FONT_SIZES, SPACING, RADIUS, USER_ROLES, API_URL, STATIC_URL } 
 import StarRating from '../../components/StarRating';
 import reviewService from '../../services/reviewService';
 import notificationService from '../../services/notificationService'; //Quitar despues ya que solo es de prueba
+import VerificationBadge from '../../components/VerificationBadge';
 
 export default function ProfileScreen({ navigation }) {
-  const { user, logout } = useAuth();
+  const { user, logout, verificationStatus } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
 
   const [reviewStats, setReviewStats] = React.useState(null);
@@ -112,8 +113,9 @@ export default function ProfileScreen({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Información del Perfil */}
+        {/* ✅ HEADER CORREGIDO */}
         <View style={styles.profileHeader}>
+          {/* Avatar */}
           <TouchableOpacity
             style={styles.avatarContainer}
             onPress={handleEditProfile}
@@ -128,26 +130,42 @@ export default function ProfileScreen({ navigation }) {
                 style={styles.avatarImage}
               />
             ) : (
-              <Text style={styles.avatarText}>
-                {user?.profile?.first_name?.[0]?.toUpperCase() ||
-                  user?.first_name?.[0]?.toUpperCase() || '👤'}
-              </Text>
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarText}>
+                  {user?.profile?.first_name?.[0]?.toUpperCase() ||
+                    user?.first_name?.[0]?.toUpperCase() || '👤'}
+                </Text>
+              </View>
             )}
           </TouchableOpacity>
 
+          {/* Nombre */}
           <Text style={styles.userName}>
             {user?.profile?.first_name || user?.first_name} {user?.profile?.last_name || user?.last_name}
           </Text>
 
+          {/* Email */}
           <Text style={styles.userEmail}>{user?.email}</Text>
 
-          <View style={[styles.badge, { backgroundColor: verificationBadge.color }]}>
-            <Text style={styles.badgeText}>{verificationBadge.text}</Text>
-          </View>
+          {/* Badge de Verificación */}
+          {verificationStatus && (
+            <View style={styles.verificationBadgeContainer}>
+              <VerificationBadge
+                emailVerified={verificationStatus.email_verified}
+                phoneVerified={verificationStatus.phone_verified}
+                profilePictureVerified={verificationStatus.profile_picture_verified}
+                size="medium"
+              />
+            </View>
+          )}
 
+          {/* Rol */}
           <View style={styles.roleContainer}>
+            <Text style={styles.roleIcon}>
+              {user?.role === USER_ROLES.WORKER ? '🔨' : '🏠'}
+            </Text>
             <Text style={styles.roleText}>
-              {user?.role === USER_ROLES.WORKER ? '🔧 Trabajador' : '🏠 Cliente'}
+              {user?.role === USER_ROLES.WORKER ? 'Trabajador' : 'Cliente'}
             </Text>
           </View>
         </View>
@@ -163,38 +181,35 @@ export default function ProfileScreen({ navigation }) {
                 </Text>
                 <Text style={styles.statLabel}>Trabajos</Text>
               </View>
-              {/* Sección de Calificaciones */}
-              {reviewStats && reviewStats.total_reviews > 0 && (
+
+              {/* Calificaciones */}
+              {reviewStats && reviewStats.total_reviews > 0 ? (
                 <TouchableOpacity
-                  style={styles.ratingsSection}
+                  style={styles.statItem}
                   onPress={() => navigation.navigate('UserReviews', {
                     userId: user.id,
                     userName: `${user.profile?.first_name || user.first_name} ${user.profile?.last_name || user.last_name}`
                   })}
                 >
-                  <View style={styles.ratingSummary}>
-                    <View style={styles.ratingMain}>
-                      <Text style={styles.ratingNumber}>
-                        {parseFloat(reviewStats.average_rating || 0).toFixed(1)}
-                      </Text>
-                      <StarRating
-                        rating={parseFloat(reviewStats.average_rating || 0)}
-                        size={16}
-                      />
-                    </View>
-                    <Text style={styles.ratingCount}>
-                      {reviewStats.total_reviews} {reviewStats.total_reviews === 1 ? 'calificación' : 'calificaciones'}
+                  <View style={styles.ratingContainer}>
+                    <Text style={styles.statValue}>
+                      {parseFloat(reviewStats.average_rating || 0).toFixed(1)}
                     </Text>
+                    <StarRating
+                      rating={parseFloat(reviewStats.average_rating || 0)}
+                      size={14}
+                    />
                   </View>
-                  <Text style={styles.viewReviewsText}>Ver todas →</Text>
+                  <Text style={styles.statLabel}>
+                    {reviewStats.total_reviews} {reviewStats.total_reviews === 1 ? 'reseña' : 'reseñas'}
+                  </Text>
                 </TouchableOpacity>
+              ) : (
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>0</Text>
+                  <Text style={styles.statLabel}>Reseñas</Text>
+                </View>
               )}
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {user?.profile?.totalRatings || 0}
-                </Text>
-                <Text style={styles.statLabel}>Reseñas</Text>
-              </View>
             </View>
           </View>
         )}
@@ -210,6 +225,23 @@ export default function ProfileScreen({ navigation }) {
           >
             <Text style={styles.menuIcon}>✏️</Text>
             <Text style={styles.menuText}>Editar Perfil</Text>
+            <Text style={styles.menuArrow}>→</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('VerificationStatus')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.menuIcon}>🔒</Text>
+            <View style={styles.menuContent}>
+              <Text style={styles.menuTitle}>Verificación</Text>
+              <Text style={styles.menuSubtitle}>
+                {verificationStatus?.is_fully_verified
+                  ? 'Perfil completamente verificado'
+                  : 'Aumenta tu credibilidad'}
+              </Text>
+            </View>
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
 
@@ -237,15 +269,6 @@ export default function ProfileScreen({ navigation }) {
 
         {/* Más Opciones */}
         <View style={styles.section}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('StaticContent', {
-              type: 'help',
-              title: 'Ayuda y Soporte'
-            })}
-          >
-            {/* ... */}
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.menuItem}
             onPress={handleHelp}
@@ -286,7 +309,7 @@ export default function ProfileScreen({ navigation }) {
             <Text style={styles.menuArrow}>→</Text>
           </TouchableOpacity>
 
-          // En el render, agrega este botón (solo en desarrollo):
+          {/* Botón de prueba (solo en desarrollo) */}
           {__DEV__ && (
             <TouchableOpacity
               style={styles.testButton}
@@ -337,16 +360,18 @@ const styles = StyleSheet.create({
   },
 
   userName: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZES['2xl'],
+    fontWeight: '700',
     color: COLORS.text.primary,
     marginBottom: SPACING.xs,
+    textAlign: 'center',
   },
 
   userEmail: {
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.base,
     color: COLORS.text.secondary,
     marginBottom: SPACING.sm,
+    textAlign: 'center',
   },
 
   badge: {
@@ -363,12 +388,18 @@ const styles = StyleSheet.create({
   },
 
   roleContainer: {
-    marginTop: SPACING.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary + '20',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full,
   },
 
   roleText: {
-    fontSize: FONT_SIZES.base,
-    color: COLORS.text.secondary,
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
 
   statsSection: {
@@ -388,6 +419,7 @@ const styles = StyleSheet.create({
 
   statItem: {
     alignItems: 'center',
+    minWidth: 100,
   },
 
   statValue: {
@@ -400,6 +432,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.text.secondary,
+    textAlign: 'center',
   },
 
   section: {
@@ -430,6 +463,7 @@ const styles = StyleSheet.create({
   menuIcon: {
     fontSize: FONT_SIZES.xl,
     marginRight: SPACING.md,
+    width: 30
   },
 
   menuText: {
@@ -452,7 +486,7 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.lg,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: COLORS.error,
   },
 
@@ -475,20 +509,21 @@ const styles = StyleSheet.create({
   },
 
   avatarContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     marginBottom: SPACING.md,
-    overflow: 'hidden',  // ✅ Importante
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
 
   avatarImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
 
   avatarText: {
@@ -539,5 +574,61 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: COLORS.primary,
     fontWeight: '600',
+  },
+
+  avatarPlaceholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  verificationBadgeContainer: {
+    marginBottom: SPACING.sm,
+  },
+
+  roleIcon: {
+    fontSize: FONT_SIZES.base,
+    marginRight: SPACING.xs,
+  },
+
+  ratingContainer: {
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  },
+
+  menuContent: {
+    flex: 1,
+  },
+
+  menuTitle: {
+    fontSize: FONT_SIZES.base,
+    fontWeight: '500',
+    color: COLORS.text.primary,
+    marginBottom: 2,
+  },
+
+  menuSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text.secondary,
+  },
+
+  testButton: {
+    backgroundColor: COLORS.info + '20',
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.info,
+  },
+
+  testButtonText: {
+    fontSize: FONT_SIZES.base,
+    fontWeight: '600',
+    color: COLORS.info,
   },
 });

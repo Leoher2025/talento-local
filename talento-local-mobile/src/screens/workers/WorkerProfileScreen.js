@@ -19,6 +19,7 @@ import workerService from '../../services/workerService';
 import reviewService from '../../services/reviewService';
 import Toast from 'react-native-toast-message';
 import galleryService from '../../services/galleryService';
+import VerificationBadge from '../../components/VerificationBadge';
 
 export default function WorkerProfileScreen({ route, navigation }) {
   const { workerId } = route.params;
@@ -149,12 +150,20 @@ export default function WorkerProfileScreen({ route, navigation }) {
             {worker.first_name} {worker.last_name}
           </Text>
 
-          {worker.verification_status === 'verified' && (
+          {/* ✅ AGREGAR Badge */}
+          <VerificationBadge
+            emailVerified={worker?.verification_status === 'verified'}
+            phoneVerified={worker?.phone_verified}
+            profilePictureVerified={worker?.profile_picture_verified}
+            size="small"
+          />
+          <Text style={styles.workerRole}>{worker?.role}</Text>
+          {/*worker.verification_status === 'verified' && (
             <View style={styles.verifiedBadge}>
               <Text style={styles.verifiedIcon}>✓</Text>
               <Text style={styles.verifiedText}>Verificado</Text>
             </View>
-          )}
+          )*/}
 
           {/* Rating */}
           {rating > 0 && (

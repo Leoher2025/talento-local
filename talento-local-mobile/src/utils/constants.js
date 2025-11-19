@@ -16,7 +16,7 @@
 // - Emulador iOS: usa localhost o 127.0.0.1
 
 // Para llamadas a la API
-export const API_BASE_URL = 'http://192.168.101.3:5000';
+export const API_BASE_URL = 'http://192.168.101.10:5000';
 export const API_URL = `${API_BASE_URL}/api`;
 
 // Para recursos estáticos (imágenes, archivos)

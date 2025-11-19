@@ -49,6 +49,10 @@ import WorkerProfileScreen from '../screens/workers/WorkerProfileScreen';
 // Pantalla de Galeria
 import MyGalleryScreen from '../screens/gallery/MyGalleryScreen';
 
+// Pantallas de Verificacion
+import PhoneVerificationScreen from '../screens/verification/PhoneVerificationScreen';
+import VerificationStatusScreen from '../screens/verification/VerificationStatusScreen';
+
 const Stack = createNativeStackNavigator();
 
 // Stack de autenticación (usuarios no logueados)
@@ -280,6 +284,23 @@ const MainStack = () => {
         component={MyGalleryScreen}
         options={{
           title: 'Mi Galería',
+          headerShown: false
+        }}
+      />
+      {/* Verificaciones de perfil*/}
+      <Stack.Screen
+        name="PhoneVerification"
+        component={PhoneVerificationScreen}
+        options={{
+          title: 'Verificar Teléfono',
+          headerShown: false
+        }}
+      />
+      <Stack.Screen
+        name="VerificationStatus"
+        component={VerificationStatusScreen}
+        options={{
+          title: 'Estado de Verificación',
           headerShown: false
         }}
       />

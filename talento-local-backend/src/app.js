@@ -15,6 +15,7 @@ const { errorHandler } = require('./middlewares/error.middleware');
 const notificationRoutes = require('./routes/notification.routes');
 const workerRoutes = require('./routes/worker.routes');
 const galleryRoutes = require('./routes/gallery.routes');
+const verificationRoutes = require('./routes/verification.routes');
 
 // Crear aplicación Express
 const app = express();
@@ -84,6 +85,9 @@ app.get('/health', (req, res) => {
 
 // Registrar rutas
 app.use('/api/notifications', notificationRoutes);
+
+// Registrar rutas de verificación
+app.use('/api/verification', verificationRoutes);
 
 // Registrar rutas de galería
 app.use('/api/gallery', galleryRoutes);

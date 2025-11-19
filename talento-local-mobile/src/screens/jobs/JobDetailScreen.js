@@ -18,6 +18,7 @@ import Toast from 'react-native-toast-message';
 import jobService from '../../services/jobService';
 import applicationService from '../../services/applicationService';
 import chatService from '../../services/chatService';
+import FavoriteButton from '../../components/FavoriteButton';
 
 // Componente de paso de estado
 function StatusStep({ icon, label, active, completed }) {
@@ -71,7 +72,7 @@ export default function JobDetailScreen({ route, navigation }) {
     }
   };
 
-    const handleDelete = () => {
+  const handleDelete = () => {
     Alert.alert(
       'Eliminar trabajo',
       '¿Estás seguro de que quieres eliminar este trabajo?',
@@ -459,6 +460,13 @@ export default function JobDetailScreen({ route, navigation }) {
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryIcon}>{job.category_icon}</Text>
             <Text style={styles.categoryName}>{job.category_name}</Text>
+            {/* ✅ Botón de favorito */}
+            <FavoriteButton
+              favoriteType="job"
+              favoriteId={job.id}
+              size="large"
+              style={styles.favoriteButton}
+            />
           </View>
         </View>
 
@@ -1251,4 +1259,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.info,
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.md,
+  },
+  favoriteButton: {
+    marginLeft: SPACING.md,
+  }
 });

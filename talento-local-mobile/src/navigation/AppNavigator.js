@@ -53,6 +53,8 @@ import MyGalleryScreen from '../screens/gallery/MyGalleryScreen';
 import PhoneVerificationScreen from '../screens/verification/PhoneVerificationScreen';
 import VerificationStatusScreen from '../screens/verification/VerificationStatusScreen';
 
+import FavoritesScreen from '../screens/favorites/FavoritesScreen';
+
 const Stack = createNativeStackNavigator();
 
 // Stack de autenticación (usuarios no logueados)
@@ -301,6 +303,14 @@ const MainStack = () => {
         component={VerificationStatusScreen}
         options={{
           title: 'Estado de Verificación',
+          headerShown: false
+        }}
+      />
+      <Stack.Screen
+        name="Favorites"
+        component={FavoritesScreen}
+        options={{
+          title: 'Mis Favoritos',
           headerShown: false
         }}
       />

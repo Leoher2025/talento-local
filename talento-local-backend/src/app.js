@@ -17,6 +17,7 @@ const workerRoutes = require('./routes/worker.routes');
 const galleryRoutes = require('./routes/gallery.routes');
 const verificationRoutes = require('./routes/verification.routes');
 const locationRoutes = require('./routes/location.routes');
+const favoriteRoutes = require('./routes/favorite.routes');
 
 // Crear aplicación Express
 const app = express();
@@ -92,6 +93,9 @@ app.use('/api/verification', verificationRoutes);
 
 // Registrar rutas de geolocalización
 app.use('/api/location', locationRoutes);
+
+// Registrar rutas de favoritos
+app.use('/api/favorites', favoriteRoutes);
 
 // Registrar rutas de galería
 app.use('/api/gallery', galleryRoutes);

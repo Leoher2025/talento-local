@@ -20,6 +20,7 @@ import reviewService from '../../services/reviewService';
 import Toast from 'react-native-toast-message';
 import galleryService from '../../services/galleryService';
 import VerificationBadge from '../../components/VerificationBadge';
+import FavoriteButton from '../../components/FavoriteButton';
 
 export default function WorkerProfileScreen({ route, navigation }) {
   const { workerId } = route.params;
@@ -148,6 +149,14 @@ export default function WorkerProfileScreen({ route, navigation }) {
 
           <Text style={styles.name}>
             {worker.first_name} {worker.last_name}
+
+            {/* ✅ Botón de favorito */}
+            <FavoriteButton
+              favoriteType="worker"
+              favoriteId={workerId}
+              size="large"
+              style={styles.favoriteButton}
+            />
           </Text>
 
           {/* ✅ AGREGAR Badge */}
@@ -1020,5 +1029,18 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: SPACING.sm,
+  },
+  nameContainer: {
+    flex: 1,
+  },
+  favoriteButton: {
+    marginLeft: SPACING.md,
   },
 });

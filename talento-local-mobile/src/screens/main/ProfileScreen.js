@@ -218,6 +218,22 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Configuración</Text>
 
+          {/* ✅ AGREGAR: Opción de Favoritos */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('Favorites')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.menuIcon}>❤️</Text>
+            <View style={styles.menuContent}>
+              <Text style={styles.menuTitle}>Mis Favoritos</Text>
+              <Text style={styles.menuSubtitle}>
+                Trabajadores y trabajos guardados
+              </Text>
+            </View>
+            <Text style={styles.menuArrow}>→</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.menuItem}
             onPress={handleEditProfile}
@@ -630,5 +646,5 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.base,
     fontWeight: '600',
     color: COLORS.info,
-  },
+  }
 });

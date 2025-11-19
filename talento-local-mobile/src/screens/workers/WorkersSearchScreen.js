@@ -25,10 +25,11 @@ import WorkerFilters from '../../components/WorkerFilters';
 import WorkerMap from '../../components/WorkerMap';
 import Slider from '@react-native-community/slider';
 import Toast from 'react-native-toast-message';
+import FavoriteButton from '../../components/FavoriteButton';
 
 export default function WorkersSearchScreen({ route, navigation }) {
   const { categoryId } = route?.params || {};
-  
+
   const [workers, setWorkers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -78,7 +79,7 @@ export default function WorkersSearchScreen({ route, navigation }) {
     try {
       setIsLoadingLocation(true);
       const location = await locationService.getCurrentLocation();
-      
+
       if (location) {
         setUserLocation(location);
         Toast.show({
@@ -285,7 +286,7 @@ export default function WorkersSearchScreen({ route, navigation }) {
               {/* Mostrar distancia si está disponible */}
               {useLocation && item.distance_km !== undefined && (
                 <Text style={styles.distanceText}>
-                  📍 {item.distance_km < 1 
+                  📍 {item.distance_km < 1
                     ? `${Math.round(item.distance_km * 1000)}m de distancia`
                     : `${item.distance_km.toFixed(1)}km de distancia`
                   }
@@ -357,6 +358,13 @@ export default function WorkersSearchScreen({ route, navigation }) {
         >
           <Text style={styles.viewProfileText}>Ver Perfil Completo</Text>
         </TouchableOpacity>
+
+        {/* ✅ Botón de favorito */}
+        <FavoriteButton
+          favoriteType="worker"
+          favoriteId={item.user_id}
+          size="small"
+        />
       </View>
     );
   };

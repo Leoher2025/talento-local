@@ -146,7 +146,7 @@ class LocationController {
           p.last_name,
           p.profile_picture_url,
           calculate_distance($1, $2, jp.latitude, jp.longitude) as distance_km
-        FROM job_postings jp
+        FROM jobs jp
         INNER JOIN profiles p ON jp.client_id = p.user_id
         WHERE 
           jp.status = 'active'

@@ -5,12 +5,13 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { COLORS, FONT_SIZES, SPACING, RADIUS, STATIC_URL, JOB_CATEGORIES } from '../utils/constants';
 import StarRating from './StarRating';
+import FavoriteButton from './FavoriteButton';
 
-export default function WorkerCard({ 
-  worker, 
-  onPress, 
+export default function WorkerCard({
+  worker,
+  onPress,
   showDistance = false,
-  onNavigate = null 
+  onNavigate = null
 }) {
   // Obtener imagen de perfil
   const getProfileImage = () => {
@@ -29,7 +30,7 @@ export default function WorkerCard({
       return [];
     }
 
-    return JOB_CATEGORIES.filter(cat => 
+    return JOB_CATEGORIES.filter(cat =>
       worker.skills.includes(cat.id)
     ).slice(0, 3); // Mostrar máximo 3
   };
@@ -40,7 +41,7 @@ export default function WorkerCard({
   const reviewCount = parseInt(worker.total_reviews || 0);
 
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.card}
       onPress={onPress}
       activeOpacity={0.7}
@@ -50,8 +51,8 @@ export default function WorkerCard({
         {/* Foto de perfil */}
         <View style={styles.avatarContainer}>
           {profileImage ? (
-            <Image 
-              source={{ uri: profileImage }} 
+            <Image
+              source={{ uri: profileImage }}
               style={styles.avatar}
             />
           ) : (
@@ -69,6 +70,14 @@ export default function WorkerCard({
               <Text style={styles.verifiedIcon}>✓</Text>
             </View>
           )}
+
+          {/* ✅ Botón de favorito */}
+          <FavoriteButton
+            favoriteType="worker"
+            favoriteId={worker.user_id}
+            size="small"
+            style={styles.favoriteButtonCard}
+          />
         </View>
 
         {/* Información básica */}
@@ -104,7 +113,7 @@ export default function WorkerCard({
         <View style={styles.distanceContainer}>
           <Text style={styles.distanceIcon}>📍</Text>
           <Text style={styles.distanceText}>
-            {worker.distance_km < 1 
+            {worker.distance_km < 1
               ? `${Math.round(worker.distance_km * 1000)}m de distancia`
               : `${worker.distance_km.toFixed(1)}km de distancia`
             }
@@ -138,7 +147,7 @@ export default function WorkerCard({
 
       {/* Botón de navegación (si está disponible) */}
       {onNavigate && worker.latitude && worker.longitude && (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.navigateButton}
           onPress={onNavigate}
         >
@@ -295,5 +304,12 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
     color: COLORS.primary,
+  },
+  headerRight: {
+    flexDirection: 'column',
+    gap: SPACING.xs,
+  },
+  favoriteButtonCard: {
+    alignSelf: 'flex-end',
   },
 });
